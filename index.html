@@ -184,7 +184,7 @@ let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,C
 const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
 function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=(S.profil&&S.profil.alamat)||''}
-const CK='koni_hsu_data_v1';
+const CK='koni_hsu_data_v2';
 function load(){
   let cached=null,raw=null;
   try{raw=localStorage.getItem(CK);if(raw)cached=JSON.parse(raw)}catch(e){}
@@ -248,8 +248,8 @@ function mediaCard(b){const e=embedUrl(b['Link Video']);if(!e)return newsCard(b)
   return `<div class="card"><div class="vid ${e.t}"><iframe src="${esc(e.u)}" loading="lazy" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="${esc(b.Judul)}"></iframe></div><div class="pd"><small>${esc(fmtD(b.Tanggal))}</small><h3>${esc(b.Judul)}</h3><p>${esc(b.Ringkasan)}</p></div></div>`}
 function berita(){const md=page==='media';
   return (md?hd('Media <span>KONI HSU</span>','Liputan, foto, dan publikasi media KONI Hulu Sungai Utara','🎬 Media'):hd('Artikel <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Artikel'))+`<div class="w pg">${md?'<div class="igb"><span>📸 Ikuti Instagram <b>@konikab.hsu</b> untuk video &amp; kegiatan terbaru</span><a class="btn s" href="https://www.instagram.com/konikab.hsu/" target="_blank" rel="noopener">Buka Instagram</a></div>':''}<div class="bar"><input placeholder="🔍 Cari ${md?'media':'artikel'}…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
-function beritaBody(){const kat=page==='media'?'Media':'Artikel',q=bq.toLowerCase(),all=S.berita.filter(b=>(String(b.Kategori||'').trim()||'Artikel')===kat),f=all.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q)),nm=kat.toLowerCase();
-  return f.length?`<p class="sub">${f.length} ${nm}</p><div class="grid">${f.slice(0,lim).map(kat==='Media'?mediaCard:newsCard).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:`<p class="sub">${all.length?(kat+' tidak ditemukan.'):'Belum ada '+nm+'.'}</p>`}
+function beritaBody(){const kat=page==='media'?'Media':'Artikel',q=bq.toLowerCase(),all=S.berita.filter(b=>(String(b.Kategori||'').trim().toLowerCase()||'artikel')===kat.toLowerCase()),f=all.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q)),nm=kat.toLowerCase();
+  return f.length?`<p class="sub">${f.length} ${nm}</p><div class="grid">${f.map(kat==='Media'?mediaCard:newsCard).join('')}</div>`:`<p class="sub">${all.length?(kat+' tidak ditemukan.'):'Belum ada '+nm+'.'}</p>`}
 function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)return;
   openM(`<small style="color:var(--r);font-weight:700">${esc(fmtD(b.Tanggal))}</small><h2 style="margin:6px 0 14px">${esc(b.Judul)}</h2>${b.Gambar?`<img src="${esc(b.Gambar)}" style="width:100%;border-radius:16px;margin-bottom:14px">`:''}<div>${lines(b.Isi||b.Ringkasan).map(p=>`<p style="margin-bottom:10px">${esc(p).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--r);word-break:break-all">$1</a>')}</p>`).join('')}</div><br><button class="btn g" onclick="closeM()">Tutup</button>`)}
 function profil(){const p=S.profil;

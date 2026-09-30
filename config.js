@@ -4,6 +4,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwtIviEw9SVwmXPHRLgkmrp
 
 // Pemanggil API ke Google Apps Script (pengganti google.script.run)
 const API_TIMEOUT_MS = 20000;
+const API_VERSION = '2026-10-01-berita';
 
 async function api(fn, ...args) {
   if (!API_URL || API_URL.indexOf('PASTE_') === 0) throw new Error('API_URL belum diisi di config.js');
@@ -11,7 +12,7 @@ async function api(fn, ...args) {
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const res = fn === 'getData'
-      ? await fetch(API_URL + '?action=getData', { signal: controller.signal, cache: 'no-store' })
+      ? await fetch(API_URL + '?action=getData&v=' + encodeURIComponent(API_VERSION) + '&_=' + Date.now(), { signal: controller.signal, cache: 'no-store' })
       : await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
