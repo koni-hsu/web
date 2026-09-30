@@ -155,7 +155,9 @@ const PF=[['visi','Visi','t'],['misi','Misi (satu baris = satu poin)','t'],['sej
 function toggleAdminDrawer(){document.body.classList.toggle('admin-nav-open')}
 function render(){$('#app').innerHTML=admin();$('#out').style.display=TOKEN?'':'none';document.body.classList.toggle('authed',!!(TOKEN&&A));if(!TOKEN)document.body.classList.remove('admin-nav-open')}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('admin-nav-open');closeM()}});
-function logout(){TOKEN='';A=null;closeM();render()}
+const SK='koni_admin_token';
+const saveT=t=>{try{t?sessionStorage.setItem(SK,t):sessionStorage.removeItem(SK)}catch(e){}};
+function logout(){TOKEN='';saveT('');A=null;closeM();render()}
 
 function admin(){
   if(!TOKEN)return `<div class="w pg" style="max-width:420px"><div class="box"><h2>🔐 Login Admin</h2><p class="sub">Masukkan password admin</p><div class="fg"><input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div><button class="btn" onclick="doLogin()">Masuk</button></div></div>`;
@@ -163,8 +165,8 @@ function admin(){
   const cur=MENU.find(m=>m[0]===tab);
   return `<div class="w pg adm" style="max-width:1300px"><aside class="sb">${MENU.map(m=>m[0]==='-'?`<div class="sg">${m[1]}</div>`:`<button class="${tab===m[0]?'on':''}" onclick="tab='${m[0]}';aq='';document.body.classList.remove('admin-nav-open');render()"><span>${m[1]}</span>${m[2]}</button>`).join('')}<div class="sg sbx">Akun</div><button class="sbx" onclick="window.open(SITE,'_top')"><span>🌐</span>Lihat Website</button><button class="sbx out" onclick="document.body.classList.remove('admin-nav-open');logout()"><span>🚪</span>Keluar</button></aside>
   <div class="ct"><h2>${CFG[tab]?CFG[tab].t:cur[2]}</h2><p class="sub">${cur[3]}</p>${tab==='Berita'?aBerita():tab==='Profil'?aProfil():aList(tab)}</div></div>`}
-function doLogin(){const b=$('#app .btn');if(b.disabled)return;b.disabled=true;run('login',$('#pw').value).then(t=>{TOKEN=t;render();loadA()}).catch(e=>{b.disabled=false;toast(e.message)})}
-function loadA(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>{toast(e.message);TOKEN='';render()})}
+function doLogin(){const b=$('#app .btn');if(b.disabled)return;b.disabled=true;run('login',$('#pw').value).then(t=>{TOKEN=t;saveT(t);render();loadA()}).catch(e=>{b.disabled=false;toast(e.message)})}
+function loadA(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>{toast(e.message);TOKEN='';saveT('');render()})}
 function aBerita(){return `<div class="fx" style="margin-bottom:14px"><b>${A.berita.length} berita</b><button class="btn s" onclick="edit('Berita')">＋ Tambah Berita</button></div><div class="tw"><table><tr><th>Judul</th><th>Kategori</th><th>Tanggal</th><th>Status</th><th></th></tr>${A.berita.map(b=>`<tr><td>${esc(b.Judul)}</td><td>${esc(b.Kategori||'Artikel')}</td><td>${esc(b.Tanggal)}</td><td>${esc(b.Status)}</td><td style="white-space:nowrap">${btns('Berita',b.ID)}</td></tr>`).join('')}</table></div>`}
 const btns=(n,id)=>`<button class="btn s g" onclick="edit('${n}','${esc(id)}')">Edit</button> <button class="btn s d" onclick="del('${n}','${esc(id)}')">Hapus</button>`;
 const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
@@ -224,7 +226,8 @@ function pickImg(inp,k,jn){const f=inp.files[0];if(!f)return;const i=sid(k);
   img.onerror=()=>{UP=false;$('#ust'+i).textContent='';toast('Gambar tidak bisa dibaca')};img.src=url}
 function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
 function closeM(){const f=ASK;ASK=null;$('#mo').classList.remove('on');f&&f(false)}
-render();
+try{TOKEN=sessionStorage.getItem(SK)||''}catch(e){TOKEN=''}
+render();if(TOKEN)loadA();
 </script>
 </body>
 </html>
