@@ -101,7 +101,7 @@ td{padding:11px 14px;border-top:1px solid var(--b)}
 .tabs button{border:0;padding:10px 20px;border-radius:99px;background:#fff;font-weight:700;border:1px solid var(--b)}
 .tabs button.on{background:var(--r);color:#fff;border-color:var(--r)}
 .fx{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
-footer{background:var(--n);color:#fff;padding:36px 0;font-size:14px}footer .w{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}footer p{opacity:.7}
+footer{background:var(--n);color:#fff;padding:16px 0;font-size:13px;line-height:1.4}footer .w{display:flex;justify-content:space-between;align-items:center;gap:14px 20px;flex-wrap:wrap}footer p{opacity:.7;font-size:12.5px}footer .fl{gap:12px;min-width:0;flex:1 1 320px}footer .fl b{font-size:14px;display:block;margin-bottom:2px}footer .fl p{max-width:640px}footer .w>p{white-space:nowrap;flex:none}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--n);color:#fff;padding:12px 22px;border-radius:99px;z-index:200;display:none}
 .ld{text-align:center;padding:80px;color:var(--m)}
 .dd{position:relative}.dd>a{display:block}
@@ -147,11 +147,12 @@ body.nav-open:after{z-index:110!important}
 .logo i.lg{background:none!important;padding:0!important;width:auto!important;height:46px!important;border-radius:0!important;overflow:visible!important;display:flex;align-items:center}
 .logo i.lg img{height:46px!important;width:auto!important;max-width:none!important}
 .fl i{background:none!important;padding:0!important;border-radius:0!important}
-.fl img{height:68px!important;width:auto}
+.fl img{height:44px!important;width:auto}
 
 /* Logo hero tanpa latar putih */
 .hl{background:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important}
 .hl img{width:240px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.45))}
+.vid iframe{display:block;width:100%;height:560px;border:0;background:#000}.vid.yt iframe{height:auto;aspect-ratio:16/9}.igb{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,#7a0a1e,#1d3a8a);color:#fff;border-radius:18px;padding:16px 20px;margin-bottom:18px}.igb a{color:#fff}
 </style>
 </head>
 <body>
@@ -159,7 +160,7 @@ body.nav-open:after{z-index:110!important}
   <button class="burger" aria-label="Buka menu" onclick="toggleNav()">☰</button>
   <div class="logo" onclick="go('home')"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>KONI<small>Hulu Sungai Utara</small></div></div>
   <div class="menu">
-    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><a data-p="berita" onclick="go('berita')">Berita</a>
+    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><div class="dd"><a class="dt" data-p="berita,artikel,media" onclick="this.parentNode.classList.toggle('open')">Berita ▾</a><div class="dm"><a data-p="artikel" onclick="go('artikel')">📰 Artikel</a><a data-p="media" onclick="go('media')">🎬 Media</a></div></div>
     <div class="dd"><a class="dt" data-p="cabor,atlet" onclick="this.parentNode.classList.toggle('open')">Cabang Olahraga &amp; Atlet ▾</a><div class="dm"><a data-p="cabor" onclick="go('cabor')">🏟️ Cabang Olahraga</a><a data-p="atlet" onclick="go('atlet')">🏃 Atlet</a></div></div>
     <div class="dd"><a class="dt" data-p="porprov" onclick="this.parentNode.classList.toggle('open')">Prestasi Atlet ▾</a><div class="dm"><a data-p="porprov" onclick="go('porprov')">🏅 Porprov 2025</a></div></div>
   </div>
@@ -204,7 +205,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeNav()})
 function go(p){page=p;lim=100;document.querySelectorAll('.dd').forEach(d=>d.classList.remove('open'));closeNav();render();scrollTo(0,0)}
 function render(){
   document.querySelectorAll('.menu a').forEach(a=>a.classList.toggle('on',a.dataset.p.split(',').includes(page)));
-  $('#app').innerHTML=({home,profil,berita,cabor,atlet,porprov})[page]();
+  $('#app').innerHTML=({home,profil,berita,artikel:berita,media:berita,cabor,atlet,porprov})[page]();
   if(page==='home')count();
   const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('in')),{threshold:.1});
   document.querySelectorAll('.rv').forEach(el=>io.observe(el));
@@ -240,9 +241,15 @@ function home(){
 `;
 }
 function count(){document.querySelectorAll('[data-c]').forEach(el=>{const t=+el.dataset.c;let n=0;const st=Math.max(1,Math.ceil(t/40));const iv=setInterval(()=>{n=Math.min(t,n+st);el.textContent=n;if(n>=t)clearInterval(iv)},25)})}
-function berita(){return hd('Berita <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Berita')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari berita…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
-function beritaBody(){const q=bq.toLowerCase(),f=S.berita.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q));
-  return f.length?`<p class="sub">${f.length} berita</p><div class="grid">${f.slice(0,lim).map(newsCard).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:`<p class="sub">${S.berita.length?'Berita tidak ditemukan.':'Belum ada berita.'}</p>`}
+const isBerita=()=>page==='berita'||page==='artikel'||page==='media';
+const embedUrl=u=>{u=String(u||'').trim();let m=u.match(/instagram\.com\/(?:[\w.]+\/)?(reels?|p|tv)\/([\w-]+)/i);if(m)return{u:'https://www.instagram.com/'+(m[1].toLowerCase().startsWith('reel')?'reel':m[1].toLowerCase())+'/'+m[2]+'/embed',t:'ig'};
+  m=u.match(/(?:youtu\.be\/|[?&]v=|shorts\/|embed\/)([\w-]{11})/);if(m)return{u:'https://www.youtube.com/embed/'+m[1],t:'yt'};return null};
+function mediaCard(b){const e=embedUrl(b['Link Video']);if(!e)return newsCard(b);
+  return `<div class="card"><div class="vid ${e.t}"><iframe src="${esc(e.u)}" loading="lazy" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="${esc(b.Judul)}"></iframe></div><div class="pd"><small>${esc(fmtD(b.Tanggal))}</small><h3>${esc(b.Judul)}</h3><p>${esc(b.Ringkasan)}</p></div></div>`}
+function berita(){const md=page==='media';
+  return (md?hd('Media <span>KONI HSU</span>','Liputan, foto, dan publikasi media KONI Hulu Sungai Utara','🎬 Media'):hd('Artikel <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Artikel'))+`<div class="w pg">${md?'<div class="igb"><span>📸 Ikuti Instagram <b>@konikab.hsu</b> untuk video &amp; kegiatan terbaru</span><a class="btn s" href="https://www.instagram.com/konikab.hsu/" target="_blank" rel="noopener">Buka Instagram</a></div>':''}<div class="bar"><input placeholder="🔍 Cari ${md?'media':'artikel'}…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
+function beritaBody(){const kat=page==='media'?'Media':'Artikel',q=bq.toLowerCase(),all=S.berita.filter(b=>(String(b.Kategori||'').trim()||'Artikel')===kat),f=all.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q)),nm=kat.toLowerCase();
+  return f.length?`<p class="sub">${f.length} ${nm}</p><div class="grid">${f.slice(0,lim).map(kat==='Media'?mediaCard:newsCard).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:`<p class="sub">${all.length?(kat+' tidak ditemukan.'):'Belum ada '+nm+'.'}</p>`}
 function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)return;
   openM(`<small style="color:var(--r);font-weight:700">${esc(fmtD(b.Tanggal))}</small><h2 style="margin:6px 0 14px">${esc(b.Judul)}</h2>${b.Gambar?`<img src="${esc(b.Gambar)}" style="width:100%;border-radius:16px;margin-bottom:14px">`:''}<div>${lines(b.Isi||b.Ringkasan).map(p=>`<p style="margin-bottom:10px">${esc(p).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--r);word-break:break-all">$1</a>')}</p>`).join('')}</div><br><button class="btn g" onclick="closeM()">Tutup</button>`)}
 function profil(){const p=S.profil;
@@ -255,7 +262,7 @@ function profil(){const p=S.profil;
 const hd=(t,p,g)=>`<div class="ph"><div class="w"><span class="tag">${g||'🏅 KONI Hulu Sungai Utara'}</span><h1>${t}</h1><p>${p}</p></div></div>`;
 const MED=['Emas','Perak','Perunggu'];
 const opt=(l,v)=>l.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
-function upd(){$('#cl').innerHTML=page==='berita'?beritaBody():page==='cabor'?(cs?cDetail():cList()):page==='atlet'?atBody():prBody()}
+function upd(){$('#cl').innerHTML=isBerita()?beritaBody():page==='cabor'?(cs?cDetail():cList()):page==='atlet'?atBody():prBody()}
 /* ---- Cabang Olahraga ---- */
 const chips=(list,cur,fn)=>`<div class="tabs">${list.map(([v,l])=>`<button class="${cur===v?'on':''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
 function setCk(v){ck=v;render()}

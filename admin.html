@@ -137,7 +137,7 @@ let A=null,TOKEN='',tab='Berita',aq='',UP=false;
 const MK='Porprov 2025 (Medali)';
 const OY=['Ya','Tidak'],KT=['Perorangan','Beregu'];
 const FORM={
- Berita:[['Judul'],['Ringkasan'],['Isi','t'],['Gambar','i'],['Tanggal','d'],['Status','s',['Terbit','Draft']]],
+ Berita:[['Judul'],['Ringkasan'],['Isi','t'],['Gambar','i'],['Link Video'],['Tanggal','d'],['Kategori','s',['Artikel','Media']],['Status','s',['Terbit','Draft']]],
  Cabor:[['Nama Cabor'],['Ketua Cabor'],['Pendamping']],
  Pertandingan:[['Cabor','c'],['Nama Pertandingan'],['Kategori','s',KT]],
  DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['NIK KTP','n'],['Foto KTP','k'],['Foto Profil','i']],
@@ -165,7 +165,7 @@ function admin(){
   <div class="ct"><h2>${CFG[tab]?CFG[tab].t:cur[2]}</h2><p class="sub">${cur[3]}</p>${tab==='Berita'?aBerita():tab==='Profil'?aProfil():aList(tab)}</div></div>`}
 function doLogin(){const b=$('#app .btn');if(b.disabled)return;b.disabled=true;run('login',$('#pw').value).then(t=>{TOKEN=t;render();loadA()}).catch(e=>{b.disabled=false;toast(e.message)})}
 function loadA(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>{toast(e.message);TOKEN='';render()})}
-function aBerita(){return `<div class="fx" style="margin-bottom:14px"><b>${A.berita.length} berita</b><button class="btn s" onclick="edit('Berita')">＋ Tambah Berita</button></div><div class="tw"><table><tr><th>Judul</th><th>Tanggal</th><th>Status</th><th></th></tr>${A.berita.map(b=>`<tr><td>${esc(b.Judul)}</td><td>${esc(b.Tanggal)}</td><td>${esc(b.Status)}</td><td style="white-space:nowrap">${btns('Berita',b.ID)}</td></tr>`).join('')}</table></div>`}
+function aBerita(){return `<div class="fx" style="margin-bottom:14px"><b>${A.berita.length} berita</b><button class="btn s" onclick="edit('Berita')">＋ Tambah Berita</button></div><div class="tw"><table><tr><th>Judul</th><th>Kategori</th><th>Tanggal</th><th>Status</th><th></th></tr>${A.berita.map(b=>`<tr><td>${esc(b.Judul)}</td><td>${esc(b.Kategori||'Artikel')}</td><td>${esc(b.Tanggal)}</td><td>${esc(b.Status)}</td><td style="white-space:nowrap">${btns('Berita',b.ID)}</td></tr>`).join('')}</table></div>`}
 const btns=(n,id)=>`<button class="btn s g" onclick="edit('${n}','${esc(id)}')">Edit</button> <button class="btn s d" onclick="del('${n}','${esc(id)}')">Hapus</button>`;
 const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function cell(k,r){
