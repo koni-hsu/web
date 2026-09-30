@@ -12,7 +12,7 @@
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
 a{color:inherit}button{font:inherit;cursor:pointer}
 .w{max-width:1150px;margin:auto;padding:0 20px}
-nav{position:sticky;top:0;z-index:50;background:rgba(11,19,48,.85);backdrop-filter:blur(14px);color:#fff}
+nav{position:sticky;top:0;z-index:50;background:var(--n);color:#fff}
 nav .w{display:flex;align-items:center;justify-content:space-between;height:66px}
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;cursor:pointer}
 .logo i{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--r),var(--g));display:grid;place-items:center;font-style:normal}
@@ -117,7 +117,7 @@ nav .w{justify-content:flex-start!important}
 <body>
 <nav><div class="w">
   <button class="admin-burger" aria-label="Buka menu admin" onclick="toggleAdminDrawer()">☰</button>
-  <div class="logo"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>Admin KONI<small>Hulu Sungai Utara</small></div></div>
+  <div class="logo"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>Admin KONI<small>Kab. Hulu Sungai Utara</small></div></div>
   <div class="menu"><a href="index.html" target="_top">← Ke Website</a><a id="out" style="display:none;background:var(--g);color:var(--n);opacity:1" onclick="logout()">Keluar</a></div>
 </div></nav>
 <main id="app"></main>
