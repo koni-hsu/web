@@ -165,12 +165,8 @@ function admin(){
   const cur=MENU.find(m=>m[0]===tab);
   return `<div class="w pg adm" style="max-width:1300px"><aside class="sb">${MENU.map(m=>m[0]==='-'?`<div class="sg">${m[1]}</div>`:`<button class="${tab===m[0]?'on':''}" onclick="tab='${m[0]}';aq='';document.body.classList.remove('admin-nav-open');render()"><span>${m[1]}</span>${m[2]}</button>`).join('')}<div class="sg sbx">Akun</div><button class="sbx" onclick="window.open(SITE,'_top')"><span>🌐</span>Lihat Website</button><button class="sbx out" onclick="document.body.classList.remove('admin-nav-open');logout()"><span>🚪</span>Keluar</button></aside>
   <div class="ct"><h2>${CFG[tab]?CFG[tab].t:cur[2]}</h2><p class="sub">${cur[3]}</p>${tab==='Berita'?aBerita():tab==='Profil'?aProfil():aList(tab)}</div></div>`}
-function doLogin(){const b=$('#app .btn');const pw=$('#pw');if(!b||b.disabled)return;if(!pw.value)return toast('Password wajib diisi');b.disabled=true;b.textContent='Memeriksa…';run('login',pw.value).then(r=>{TOKEN=r.token;A=r.data;saveT(TOKEN);render()}).catch(e=>{b.disabled=false;b.textContent='Masuk';toast(e.message)})}
-function loadA(){
-  if(!TOKEN)return;
-  $('#app').innerHTML='<div class="w pg" style="max-width:650px"><div class="box" style="text-align:center"><h2>Memuat data admin…</h2><p class="sub">Sesi berhasil dibuat. Mengambil data yang diperlukan.</p><div class="ld" style="padding:24px">⏳ Mohon tunggu sebentar</div></div></div>';
-  run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>{toast(e.message);TOKEN='';saveT('');A=null;render()})
-}
+function doLogin(){const b=$('#app .btn');if(b.disabled)return;b.disabled=true;run('login',$('#pw').value).then(r=>{TOKEN=r.token;A=r.data;saveT(TOKEN);render()}).catch(e=>{b.disabled=false;toast(e.message)})}
+function loadA(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>{toast(e.message);TOKEN='';saveT('');render()})}
 function aBerita(){return `<div class="fx" style="margin-bottom:14px"><b>${A.berita.length} berita</b><button class="btn s" onclick="edit('Berita')">＋ Tambah Berita</button></div><div class="tw"><table><tr><th>Judul</th><th>Kategori</th><th>Tanggal</th><th>Status</th><th></th></tr>${A.berita.map(b=>`<tr><td>${esc(b.Judul)}</td><td>${esc(b.Kategori||'Artikel')}</td><td>${esc(b.Tanggal)}</td><td>${esc(b.Status)}</td><td style="white-space:nowrap">${btns('Berita',b.ID)}</td></tr>`).join('')}</table></div>`}
 const btns=(n,id)=>`<button class="btn s g" onclick="edit('${n}','${esc(id)}')">Edit</button> <button class="btn s d" onclick="del('${n}','${esc(id)}')">Hapus</button>`;
 const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
@@ -190,14 +186,8 @@ const athOpts=cab=>A.dataatlet.filter(a=>!cab||a.Cabor===cab).map(a=>`<option va
 const opts=(l,v)=>{v=v==null?'':v;l=l.includes(v)?l:[...l,v];return l.map(x=>`<option ${x==v?'selected':''}>${esc(x)}</option>`).join('')};
 function cabChg(){const cab=$('#mb [data-k="Cabor"]').value;$('#fp').innerHTML=opts(['',...pertNames(cab)],'');$('#dl').innerHTML=athOpts(cab)}
 function pertChg(){const cab=$('#mb [data-k="Cabor"]').value,p=$('#fp').value,m=A.pertandingan.find(x=>x.Cabor===cab&&x['Nama Pertandingan']===p);if(m&&m.Kategori)$('#mb [data-k="Kategori"]').value=m.Kategori}
-async function edit(n,id){
-  const c=CFG[n]||{k:'ID',dk:'berita'};
-  let r=id?A[c.dk].find(x=>String(x[c.k])===String(id)):{};
-  if(id){
-    openM('<div class="ld" style="padding:40px 10px"><h2>Memuat data…</h2><p>Menyiapkan formulir.</p></div>');
-    try{r=await run('getAdminRow',TOKEN,n,id)}catch(e){closeM();return toast(e.message)}
-  }
-  const cab=r.Cabor||'';
+function edit(n,id){
+  const c=CFG[n]||{k:'ID',dk:'berita'},r=id?A[c.dk].find(x=>String(x[c.k])===String(id)):{},cab=r.Cabor||'';
   const fld=FORM[n].map(([k,t,o])=>{const v=r[k]==null?(k==='Tanggal'&&n==='Berita'?new Date().toISOString().slice(0,10):''):r[k];let inp;
     if(t==='i'||t==='k')inp=imgField(k,v,t==='k'?'ktp':n==='Berita'?'berita':'profil');
     else if(t==='n')inp=`<input data-k="${k}" inputmode="numeric" placeholder="16 digit NIK" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,16)" value="${esc(v)}">`;
@@ -237,7 +227,7 @@ function pickImg(inp,k,jn){const f=inp.files[0];if(!f)return;const i=sid(k);
 function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
 function closeM(){const f=ASK;ASK=null;$('#mo').classList.remove('on');f&&f(false)}
 try{TOKEN=sessionStorage.getItem(SK)||''}catch(e){TOKEN=''}
-render();if(TOKEN)loadA();
+render();if(TOKEN)loadA();else{try{fetch(API_URL+'?action=ping')}catch(e){}} // bangunkan server Apps Script selagi admin mengetik password
 </script>
 </body>
 </html>
