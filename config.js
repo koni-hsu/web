@@ -1,6 +1,6 @@
 // ====== KONFIGURASI ======
 // Tempel URL Web App Apps Script Anda (yang berakhiran /exec) di bawah ini.
-const API_URL = 'https://script.google.com/macros/s/AKfycbxmYcNKu4oy0VG-ls3DbFHNf-Kt_I70bsfIs8Lbmcn_qSqAKi57g5p4MV6co1Ol55yQNw/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwtIviEw9SVwmXPHRLgkmrpPlisG0-lyNHrjgt9EX_1PYEoSSLriZsggeXKj49VcrjH/exec';
 
 // Pemanggil API ke Google Apps Script (pengganti google.script.run)
 async function api(fn, ...args) {
