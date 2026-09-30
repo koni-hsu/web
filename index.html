@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet"></noscript>
+<style>
+:root{--r:#c8102e;--g:#f5b800;--n:#0b1330;--bg:#f4f6fb;--c:#fff;--t:#1b2240;--m:#6b7390;--b:#e4e8f2}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
+a{color:inherit}button{font:inherit;cursor:pointer}
+.w{max-width:1150px;margin:auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:50;background:rgba(11,19,48,.85);backdrop-filter:blur(14px);color:#fff}
+nav .w{display:flex;align-items:center;justify-content:space-between;height:66px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;cursor:pointer}
+.logo i{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--r),var(--g));display:grid;place-items:center;font-style:normal}
+.logo i.lg{background:#fff;padding:3px;width:44px;height:44px;overflow:hidden;flex:none}.logo i.lg img{height:38px;width:auto;max-width:100%;object-fit:contain;display:block}
+.logo small{display:block;font-weight:400;font-size:11px;opacity:.7;line-height:1}
+.menu{display:flex;gap:6px}
+.menu a{padding:8px 16px;border-radius:99px;text-decoration:none;font-size:14px;font-weight:600;cursor:pointer;opacity:.8;transition:.2s}
+.menu a:hover,.menu a.on{background:rgba(255,255,255,.14);opacity:1}
+.menu a.adm{background:var(--g);color:var(--n);opacity:1}
+.burger{display:none;background:none;border:0;color:#fff;font-size:26px}
+.hero{background:radial-gradient(circle at 20% 20%,#7a0a1e,transparent 45%),radial-gradient(circle at 85% 70%,#1d3a8a,transparent 45%),var(--n);color:#fff;padding:54px 0 70px;position:relative;overflow:hidden}
+.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;filter:blur(70px);animation:fl 9s ease-in-out infinite}
+.hero:before{width:320px;height:320px;background:var(--r);opacity:.35;top:-80px;right:10%}
+.hero:after{width:260px;height:260px;background:var(--g);opacity:.25;bottom:-60px;left:8%;animation-delay:-4s}
+@keyframes fl{50%{transform:translate(40px,30px) scale(1.15)}}
+.hero .w{position:relative;z-index:1}
+.hl{position:absolute;right:20px;top:50%;transform:translateY(-50%);background:#fff;border-radius:32px;padding:22px 26px;box-shadow:0 30px 70px rgba(0,0,0,.45);animation:fl2 6s ease-in-out infinite}.hl img{width:220px;display:block}
+@keyframes fl2{50%{transform:translateY(-54%)}}
+.fl{display:flex;gap:14px;align-items:center}.fl i{background:#fff;border-radius:14px;padding:4px;display:block}.fl img{height:54px;display:block}
+.tag{display:inline-block;padding:5px 13px;border-radius:99px;background:rgba(255,255,255,.12);font-size:12px;font-weight:600;margin-bottom:10px}
+.hero h1{font-size:clamp(28px,4.7vw,48px);font-weight:800;line-height:1.08;max-width:680px}
+.hero h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;color:transparent}
+.hero p{max-width:520px;margin:10px 0 17px;opacity:.8}
+.btn{display:inline-block;border:0;padding:12px 24px;border-radius:99px;font-weight:700;background:var(--r);color:#fff;text-decoration:none;transition:.2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(200,16,46,.35)}
+.btn.o{background:rgba(255,255,255,.12);margin-left:8px}.btn.s{padding:7px 14px;font-size:13px}.btn.g{background:var(--bg);color:var(--t)}.btn.d{background:#fee;color:var(--r)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:-42px;position:relative;z-index:2;padding:0 10px}
+.st{background:var(--c);border-radius:50%;width:150px;height:150px;padding:18px;box-shadow:0 12px 36px rgba(11,19,48,.09);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:auto;animation:statIn .7s ease both;transition:transform .3s,box-shadow .3s}
+.st:hover{transform:translateY(-7px) scale(1.04);box-shadow:0 18px 42px rgba(11,19,48,.15)}
+.st i{font-style:normal;font-size:28px;line-height:1;margin-bottom:6px;animation:statIcon 2.4s ease-in-out infinite}
+.st b{display:block;font-size:34px;font-weight:800;line-height:1.05}.st span{color:var(--m);font-size:13px}
+@keyframes statIn{from{opacity:0;transform:scale(.7) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes statIcon{50%{transform:translateY(-3px) rotate(3deg)}}
+.cap{text-align:center;color:var(--m);font-size:14px;margin:18px 0 52px}
+.av{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--r),var(--n));color:#fff;display:grid;place-items:center;font-weight:800;flex:none}.av.big{width:112px;height:112px;font-size:36px;border-radius:26px}
+.ath{display:flex;gap:18px;align-items:center;padding:22px}.ath small{display:block;color:var(--m);margin-bottom:8px}.ath b{display:block;font-size:18px;line-height:1.3;margin-bottom:2px}.ath>div:last-child{min-width:0}
+.ath .av{width:104px;height:104px;border-radius:24px;font-size:34px}
+.grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:980px){.grid.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.grid.g3{grid-template-columns:1fr}.ath{padding:18px;gap:16px}.ath .av{width:88px;height:88px;font-size:28px;border-radius:20px}}
+.pr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--b)}.pr small{display:block;color:var(--m)}
+.sec{display:flex;align-items:center;gap:10px;margin:26px 0 14px;font-size:20px;flex-wrap:wrap}.sec:first-child{margin-top:4px}
+section{padding:56px 0}
+h2{font-size:24px;font-weight:800;line-height:1.25;margin-bottom:4px}.sub{color:var(--m);font-size:14px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:22px}
+.card{background:var(--c);border-radius:20px;overflow:hidden;box-shadow:0 4px 18px rgba(11,19,48,.06);transition:.3s;border:1px solid var(--b)}
+.card.h{cursor:pointer}.card.h:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(11,19,48,.14)}
+.img{height:170px;background:linear-gradient(135deg,var(--r),var(--n)) center/cover;display:grid;place-items:center;font-size:44px}
+.pd{padding:20px}.pd small{color:var(--r);font-weight:700;font-size:12px}.pd h3{font-size:17px;margin:4px 0 6px;line-height:1.3}.pd p{color:var(--m);font-size:14px}
+.rv{opacity:0;transform:translateY(24px);transition:.6s}.rv.in{opacity:1;transform:none}
+.w.pg{padding:30px 20px 60px;min-height:70vh}
+.ph{background:radial-gradient(circle at 20% 20%,#7a0a1e,transparent 45%),radial-gradient(circle at 85% 70%,#1d3a8a,transparent 45%),var(--n);color:#fff;padding:26px 0 30px;position:relative;overflow:hidden}
+.ph:before,.ph:after{content:"";position:absolute;border-radius:50%;filter:blur(60px);animation:fl 9s ease-in-out infinite}
+.ph:before{width:240px;height:240px;background:var(--r);opacity:.32;top:-100px;right:10%}
+.ph:after{width:200px;height:200px;background:var(--g);opacity:.22;bottom:-90px;left:8%;animation-delay:-4s}
+.ph .w{position:relative;z-index:1}.ph .tag{margin-bottom:8px}
+.ph h1{font-size:clamp(22px,3.4vw,30px);font-weight:800;line-height:1.15}
+.ph h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ph p{opacity:.8;font-size:14px;margin-top:5px;max-width:600px}
+.box{background:var(--c);border-radius:20px;padding:28px;border:1px solid var(--b);margin-bottom:22px}
+.box h3{margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.box ol{padding-left:20px}.box li{margin:6px 0}
+.org{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.org div{background:var(--bg);border-radius:16px;padding:18px;border-top:4px solid var(--r)}.org small{color:var(--m)}.org b{display:block}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+input,select,textarea{font:inherit;padding:11px 16px;border:1px solid var(--b);border-radius:14px;background:#fff;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--r);box-shadow:0 0 0 3px rgba(200,16,46,.12)}
+.bar input{flex:2;min-width:200px}.bar select{flex:1;min-width:160px}
+.cb{padding:22px;cursor:pointer}.cb h3{font-size:16px;margin-bottom:10px}
+.kp{display:flex;gap:28px;flex-wrap:wrap}.kp div{min-width:0}.kp small{display:block;color:var(--m);font-size:12px}.kp b{display:block;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.cb .kp{margin-top:14px;padding-top:12px;border-top:1px solid var(--b);gap:18px}.kp.big{gap:36px}.kp.big small{font-size:13px}.kp.big b{font-size:17px}
+.md{display:flex;gap:6px;flex-wrap:wrap}
+.bd{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:var(--bg)}
+.Emas{background:#fff3c4;color:#8a6500}.Perak{background:#e9edf3;color:#4a5568}.Perunggu{background:#fde5d3;color:#9c4a1a}
+.tw{overflow-x:auto;background:var(--c);border-radius:20px;border:1px solid var(--b)}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th{background:var(--bg);text-align:left;padding:12px 14px;font-size:12px;text-transform:uppercase;color:var(--m)}
+td{padding:11px 14px;border-top:1px solid var(--b)}
+.mo{position:fixed;inset:0;background:rgba(11,19,48,.6);backdrop-filter:blur(4px);z-index:100;display:none;place-items:center;padding:16px}
+.mo.on{display:grid}
+.mb{background:#fff;border-radius:24px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:28px;animation:pop .25s}
+@keyframes pop{from{transform:scale(.94);opacity:0}}
+.fg{margin-bottom:14px}.fg label{display:block;font-size:13px;font-weight:700;margin-bottom:4px}
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.tabs button{border:0;padding:10px 20px;border-radius:99px;background:#fff;font-weight:700;border:1px solid var(--b)}
+.tabs button.on{background:var(--r);color:#fff;border-color:var(--r)}
+.fx{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+footer{background:var(--n);color:#fff;padding:36px 0;font-size:14px}footer .w{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}footer p{opacity:.7}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--n);color:#fff;padding:12px 22px;border-radius:99px;z-index:200;display:none}
+.ld{text-align:center;padding:80px;color:var(--m)}
+.dd{position:relative}.dd>a{display:block}
+.dm{display:none;position:absolute;top:100%;left:0;min-width:220px;background:var(--n);border-radius:16px;padding:8px;box-shadow:0 18px 40px rgba(0,0,0,.35);flex-direction:column;gap:2px;z-index:60}
+.dd:hover .dm,.dd.open .dm{display:flex}
+@media(max-width:760px){.dm{position:static;box-shadow:none;background:rgba(255,255,255,.06);margin:4px 0 4px 12px}.dd:hover .dm{display:none}.dd.open .dm{display:flex}}
+@media(max-width:1000px){.hl{display:none}}
+@media(max-width:760px){.burger{display:block}.menu{display:none;position:absolute;top:66px;left:0;right:0;background:var(--n);flex-direction:column;padding:12px}.menu.on{display:flex}.hero{padding:42px 0 62px}.hero h1{font-size:clamp(27px,7.8vw,38px)}.hero p{margin:8px 0 16px}.btn.o{margin:7px 0 0}}
+@media(max-width:760px){.w{padding:0 16px}nav .w{height:66px}.menu{display:flex!important;position:fixed!important;top:0;bottom:0;left:0;right:auto;width:min(84vw,330px);height:100dvh;padding:88px 18px 24px!important;background:#0b1330!important;flex-direction:column!important;align-items:stretch;gap:8px;z-index:120;transform:translateX(-105%);transition:transform .28s ease;box-shadow:18px 0 50px #06102b55;overflow-y:auto}.menu.on{transform:translateX(0)}.menu a{display:flex;align-items:center;min-height:48px;padding:12px 15px;border-radius:13px}.burger{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#ffffff16;z-index:130}body.nav-open:after{content:"";position:fixed;inset:0;background:#07102799;backdrop-filter:blur(2px);z-index:110}.dd .dm{position:static;width:100%;min-width:0;margin:4px 0 4px 8px;padding:6px;background:#ffffff0c}.hero{padding:42px 0 62px}.hero h1{font-size:clamp(27px,7.8vw,38px)}.hero p{margin:8px 0 16px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:-30px;padding:0}.st{width:125px;height:125px;padding:14px}.st i{font-size:23px}.st b{font-size:27px}section{padding:38px 0}h2{font-size:24px}.grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:14px}.box{padding:18px}.bar{display:grid;grid-template-columns:1fr}.bar input,.bar select{min-width:0}.tw{border-radius:14px}.mb{padding:20px}footer .w{align-items:flex-start}}@media(max-width:760px){.w.pg{padding:22px 16px 48px}.ph{padding:22px 0 24px}.ph p{font-size:13px}h2{font-size:21px}.sec{font-size:18px}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+/* === FIX MOBILE: tombol menu kiri atas + teks menu jelas === */
+@media(max-width:760px){
+nav{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#0b1330!important;z-index:200!important}
+nav .w{justify-content:flex-start!important;gap:12px}
+.burger{order:-1;flex:none;font-size:24px;line-height:1;color:#fff;border:1px solid #ffffff30;cursor:pointer}
+.logo{order:0;min-width:0}
+body.nav-open:after{z-index:110!important}
+.menu{z-index:120!important;padding-top:84px!important}
+.menu a,.menu .dd>a{color:#fff!important;opacity:1!important;font-size:16px!important;font-weight:600;background:transparent}
+.menu a:hover,.menu a:active{background:rgba(255,255,255,.16)!important}
+.menu a.on{background:rgba(245,184,0,.22)!important;color:#ffd24d!important}
+.menu a.adm{background:var(--g)!important;color:var(--n)!important}
+.dd .dm{background:#16214a!important}
+.dd .dm a{color:#fff!important;font-size:15px!important;font-weight:500}
+.dd .dm a.on{color:#ffd24d!important}
+}
+
+/* Tombol kembali: jelas & di kanan */
+.btn.backbtn{background:var(--r);color:#fff;padding:12px 22px;font-size:15px;font-weight:800;box-shadow:0 6px 16px rgba(200,16,46,.35);border:2px solid var(--r)}
+.btn.backbtn:hover{background:#a80d25;border-color:#a80d25}
+@media(max-width:760px){.btn.backbtn{width:100%;text-align:center;font-size:15px}}
+
+/* Skeleton loading */
+.sk{max-width:1150px;margin:auto;padding:0 20px}
+.sk .hb{height:230px;border-radius:0;background:linear-gradient(120deg,#1a2452,#3a1230);margin:0 -20px 24px}
+.sk .ro{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:-50px}
+.sk .ci{aspect-ratio:1;border-radius:50%;max-width:200px;width:100%;margin:auto}
+.sk .ln{height:16px;border-radius:8px;margin:14px 0}
+.sk .ci,.sk .ln{background:linear-gradient(90deg,#e8ecf6 25%,#f6f8fd 50%,#e8ecf6 75%);background-size:200% 100%;animation:shm 1.2s linear infinite}
+@keyframes shm{to{background-position:-200% 0}}
+@media(max-width:760px){.sk .hb{height:200px}.sk .ro{grid-template-columns:repeat(2,1fr);margin-top:-30px}.sk .ci{max-width:125px}}
+
+/* Logo tanpa latar putih */
+.logo i.lg{background:none!important;padding:0!important;width:auto!important;height:46px!important;border-radius:0!important;overflow:visible!important;display:flex;align-items:center}
+.logo i.lg img{height:46px!important;width:auto!important;max-width:none!important}
+.fl i{background:none!important;padding:0!important;border-radius:0!important}
+.fl img{height:68px!important;width:auto}
+
+/* Logo hero tanpa latar putih */
+.hl{background:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important}
+.hl img{width:240px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.45))}
+</style>
+</head>
+<body>
+<nav><div class="w">
+  <button class="burger" aria-label="Buka menu" onclick="toggleNav()">☰</button>
+  <div class="logo" onclick="go('home')"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>KONI<small>Hulu Sungai Utara</small></div></div>
+  <div class="menu">
+    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><a data-p="berita" onclick="go('berita')">Berita</a>
+    <div class="dd"><a class="dt" data-p="cabor,atlet" onclick="this.parentNode.classList.toggle('open')">Cabang Olahraga &amp; Atlet ▾</a><div class="dm"><a data-p="cabor" onclick="go('cabor')">🏟️ Cabang Olahraga</a><a data-p="atlet" onclick="go('atlet')">🏃 Atlet</a></div></div>
+    <div class="dd"><a class="dt" data-p="porprov" onclick="this.parentNode.classList.toggle('open')">Prestasi Atlet ▾</a><div class="dm"><a data-p="porprov" onclick="go('porprov')">🏅 Porprov 2025</a></div></div>
+  </div>
+</div></nav>
+<main id="app"><div class="sk"><div class="hb"></div><div class="ro"><div class="ci"></div><div class="ci"></div><div class="ci"></div><div class="ci"></div></div><div class="ln" style="width:60%"></div><div class="ln" style="width:85%"></div><div class="ln" style="width:70%"></div></div></main>
+<footer><div class="w"><div class="fl"><i><img data-logo alt="Logo KONI HSU"></i><div><b>KONI Kabupaten Hulu Sungai Utara</b><p id="ft"></p></div></div><p>© KONI HSU</p></div></footer>
+<div class="mo" id="mo" onclick="if(event.target===this)closeM()"><div class="mb" id="mb"></div></div>
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script src="logo.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+document.querySelectorAll('img[data-logo]').forEach(i=>i.src=LOGO);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const run=api;
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
+const lines=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
+const MK='Porprov 2025 (Medali)';
+let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',aq='',pc='',pm='',pq='',ck='',bq='';
+const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
+
+function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=(S.profil&&S.profil.alamat)||''}
+const CK='koni_hsu_data_v1';
+function load(){
+  let cached=null,raw=null;
+  try{raw=localStorage.getItem(CK);if(raw)cached=JSON.parse(raw)}catch(e){}
+  if(cached){try{applyData(cached)}catch(e){cached=null}}
+  run('getData').then(d=>{
+    let j=null;try{j=JSON.stringify(d)}catch(e){}
+    if(j&&j===raw&&cached)return;
+    try{if(j)localStorage.setItem(CK,j)}catch(e){}
+    const busy=document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+    if(!cached||!busy)applyData(d);
+  }).catch(e=>{if(!cached)$('#app').innerHTML='<div class="ld">Gagal memuat: '+esc(e.message)+'</div>'});
+}
+function setBurger(){var b=document.querySelector('.burger');if(b)b.textContent=document.body.classList.contains('nav-open')?'✕':'☰'}
+function toggleNav(){$('.menu').classList.toggle('on');document.body.classList.toggle('nav-open');setBurger()}
+function closeNav(){$('.menu').classList.remove('on');document.body.classList.remove('nav-open');setBurger()}
+document.addEventListener('click',function(e){if(document.body.classList.contains('nav-open')&&!e.target.closest('.menu,.burger'))closeNav()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeNav()});
+function go(p){page=p;lim=100;document.querySelectorAll('.dd').forEach(d=>d.classList.remove('open'));closeNav();render();scrollTo(0,0)}
+function render(){
+  document.querySelectorAll('.menu a').forEach(a=>a.classList.toggle('on',a.dataset.p.split(',').includes(page)));
+  $('#app').innerHTML=({home,profil,berita,cabor,atlet,porprov})[page]();
+  if(page==='home')count();
+  const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('in')),{threshold:.1});
+  document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+}
+const medals=()=>{const c={Emas:0,Perak:0,Perunggu:0};S.atlet.forEach(a=>c[a.Medali]!==undefined&&c[a.Medali]++);return c};
+const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const nk=(a,c)=>String(a||'').trim().replace(/\s+/g,' ').toLowerCase()+'|'+String(c||'').trim().toLowerCase();
+function athletes(){const m={};S.dataatlet.forEach(a=>{m[nk(a['Nama Atlet'],a.Cabor)]={n:String(a['Nama Atlet']).trim(),c:a.Cabor,jk:a['Jenis Kelamin'],f:a['Foto Profil']||'',p:[]}});
+  S.atlet.forEach(r=>{const k=nk(r['Nama Atlet'],r.Cabor);(m[k]=m[k]||{n:r['Nama Atlet'],c:r.Cabor,jk:'',p:[]}).p.push(r)});
+  return Object.values(m).sort((a,b)=>String(a.n).localeCompare(String(b.n)))}
+const mcount=rows=>{const c={Emas:0,Perak:0,Perunggu:0};rows.forEach(r=>c[r.Medali]!==undefined&&c[r.Medali]++);return c};
+const mbadge=c=>`<div class="md"><span class="bd Emas">🥇 ${c.Emas}</span><span class="bd Perak">🥈 ${c.Perak}</span><span class="bd Perunggu">🥉 ${c.Perunggu}</span></div>`;
+function pertOf(cab){const m={};S.pertandingan.filter(p=>p.Cabor===cab).forEach(p=>m[p['Nama Pertandingan']]={n:p['Nama Pertandingan'],k:p.Kategori,r:[]});
+  S.atlet.filter(r=>r.Cabor===cab&&r.Pertandingan).forEach(r=>{(m[r.Pertandingan]=m[r.Pertandingan]||{n:r.Pertandingan,k:r.Kategori,r:[]}).r.push(r)});
+  return Object.values(m).sort((a,b)=>a.n.localeCompare(b.n))}
+const av=(a,b)=>`<div class="av${b?' big':''}"${a.f?` style="background:url('${esc(a.f)}') center/cover"`:''}>${a.f?'':esc(ini(a.n))}</div>`;
+const kpOf=n=>S.cabor.find(c=>c['Nama Cabor']===n)||{};
+const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div><div><small>🤝 Pendamping</small><b>${esc(String(c.Pendamping||'').trim()||'-')}</b></div></div>`};
+const KAT=['Beregu','Perorangan'],hasD=c=>c.pt>0||c.a>0;
+const caborList=kat=>{const m={};S.cabor.forEach(c=>c['Nama Cabor']&&(m[c['Nama Cabor']]=1));S.atlet.forEach(r=>r.Cabor&&(m[r.Cabor]=1));
+  return Object.keys(m).sort((a,b)=>a.localeCompare(b)).map(n=>({n,pt:pertOf(n).filter(p=>!kat||p.k===kat).length,a:S.ath.filter(x=>x.c===n&&(!kat||x.p.some(r=>r.Kategori===kat))).length,m:mcount(S.atlet.filter(r=>r.Cabor===n&&(!kat||r.Kategori===kat)))}))};
+const fmtD=d=>{try{return new Date(d).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
+function newsCard(b){return `<div class="card h" onclick="readNews('${esc(b.ID)}')"><div class="img" style="${b.Gambar?`background-image:url('${esc(b.Gambar)}')`:''}">${b.Gambar?'':'📰'}</div><div class="pd"><small>${esc(fmtD(b.Tanggal))}</small><h3>${esc(b.Judul)}</h3><p>${esc(b.Ringkasan)}</p></div></div>`}
+function home(){
+  const m=medals(),cb=caborList().length;
+  return `<div class="hero"><div class="w"><div class="hl"><img src="${LOGO}" alt="Logo KONI HSU"></div><span class="tag">🏅 Komite Olahraga Nasional Indonesia</span>
+  <h1>Membangun <span>Prestasi</span> Olahraga Hulu Sungai Utara</h1>
+  <p>Portal resmi informasi cabang olahraga, atlet berprestasi, dan berita terbaru KONI Kabupaten Hulu Sungai Utara.</p>
+  <a class="btn" onclick="go('cabor')">Lihat Cabang Olahraga</a><a class="btn o" onclick="go('profil')">Profil KONI</a></div></div>
+  <div class="w"><div class="stats">
+  ${[[cb,'Cabang Olahraga','🏟️'],[S.atlet.length,'Atlet Berprestasi','🏃'],[m.Emas,'Medali Emas','🥇'],[m.Perak,'Medali Perak','🥈'],[m.Perunggu,'Medali Perunggu','🥉']].map(x=>`<div class="st"><i>${x[2]}</i><b data-c="${x[0]}">0</b><span>${x[1]}</span></div>`).join('')}
+  </div><p class="cap">🏅 <b>Prestasi Kontingen Hulu Sungai Utara pada Porprov 2025</b> · jumlah medali dihitung per atlet</p></div>
+`;
+}
+function count(){document.querySelectorAll('[data-c]').forEach(el=>{const t=+el.dataset.c;let n=0;const st=Math.max(1,Math.ceil(t/40));const iv=setInterval(()=>{n=Math.min(t,n+st);el.textContent=n;if(n>=t)clearInterval(iv)},25)})}
+function berita(){return hd('Berita <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Berita')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari berita…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
+function beritaBody(){const q=bq.toLowerCase(),f=S.berita.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q));
+  return f.length?`<p class="sub">${f.length} berita</p><div class="grid">${f.slice(0,lim).map(newsCard).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:`<p class="sub">${S.berita.length?'Berita tidak ditemukan.':'Belum ada berita.'}</p>`}
+function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)return;
+  openM(`<small style="color:var(--r);font-weight:700">${esc(fmtD(b.Tanggal))}</small><h2 style="margin:6px 0 14px">${esc(b.Judul)}</h2>${b.Gambar?`<img src="${esc(b.Gambar)}" style="width:100%;border-radius:16px;margin-bottom:14px">`:''}<div>${lines(b.Isi||b.Ringkasan).map(p=>`<p style="margin-bottom:10px">${esc(p).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--r);word-break:break-all">$1</a>')}</p>`).join('')}</div><br><button class="btn g" onclick="closeM()">Tutup</button>`)}
+function profil(){const p=S.profil;
+  return hd('Profile <span>KONI HSU</span>','Mengenal organisasi, visi, dan misi kami','🏛️ Profil Organisasi')+`
+  <div class="w pg"><div class="box rv"><h3>🎯 Visi</h3><p>${esc(p.visi)}</p></div>
+  <div class="box rv"><h3>🚀 Misi</h3><ol>${lines(p.misi).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div>
+  <div class="box rv"><h3>📖 Sejarah</h3>${lines(p.sejarah).map(x=>`<p>${esc(x)}</p>`).join('')}</div>
+  <div class="box rv"><h3>👥 Struktur Organisasi</h3><div class="org">${lines(p.struktur).map(l=>{const[a,b]=l.split('|');return `<div><small>${esc((a||'').trim())}</small><b>${esc((b||'').trim())}</b></div>`}).join('')}</div></div>
+  <div class="box rv"><h3>📍 Kontak</h3><p>${esc(p.alamat)}<br>Telp: ${esc(p.telepon)} · Email: ${esc(p.email)}</p></div></div>`}
+const hd=(t,p,g)=>`<div class="ph"><div class="w"><span class="tag">${g||'🏅 KONI Hulu Sungai Utara'}</span><h1>${t}</h1><p>${p}</p></div></div>`;
+const MED=['Emas','Perak','Perunggu'];
+const opt=(l,v)=>l.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
+function upd(){$('#cl').innerHTML=page==='berita'?beritaBody():page==='cabor'?(cs?cDetail():cList()):page==='atlet'?atBody():prBody()}
+/* ---- Cabang Olahraga ---- */
+const chips=(list,cur,fn)=>`<div class="tabs">${list.map(([v,l])=>`<button class="${cur===v?'on':''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
+function setCk(v){ck=v;render()}
+function cabor(){
+  if(cs){const ks=[...new Set(pertOf(cs).map(p=>p.k))].filter(k=>KAT.includes(k));
+    const inf=`<div class="box">${kpInfo(cs,1)}</div>`;
+    return hd(`<span>${esc(cs)}</span>`+(ck?` · ${ck}`:''),'Jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg"><div class="fx" style="margin-bottom:14px;justify-content:flex-end"><button class="btn backbtn" onclick="cs='';render()">← Semua Cabang Olahraga</button></div>${inf}
+    ${ks.length>1?chips([['','Semua'],...ks.map(k=>[k,k])],ck,'setCk'):''}
+    <div class="tabs">${[['pert','🎯 Jenis Pertandingan'],['atlet','🏃 Atlet']].map(([k,l])=>`<button class="${ct===k?'on':''}" onclick="ct='${k}';lim=100;render()">${l}</button>`).join('')}</div><div id="cl">${cDetail()}</div></div>`}
+  const nb=caborList('Beregu').filter(hasD).length,np=caborList('Perorangan').filter(hasD).length;
+  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beregu dan perorangan beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg">${chips([['','Semua'],['Beregu',`👥 Beregu (${nb})`],['Perorangan',`🧍 Perorangan (${np})`]],ck,'setCk')}<div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"></div><div id="cl">${cList()}</div></div>`}
+function cList(){const q=cq.toLowerCase(),ok=c=>c.n.toLowerCase().includes(q);CL=[];
+  const card=(c,k)=>{CL.push({n:c.n,k});return `<div class="card h cb" onclick="pick(${CL.length-1})"><h3>${esc(c.n)}</h3><div class="md"><span class="bd">🏃 ${c.a} atlet</span><span class="bd">🎯 ${c.pt} pertandingan</span></div>${kpInfo(c.n)}</div>`};
+  const L={Beregu:caborList('Beregu').filter(c=>hasD(c)&&ok(c)),Perorangan:caborList('Perorangan').filter(c=>hasD(c)&&ok(c))};
+  const used=new Set([...L.Beregu,...L.Perorangan].map(c=>c.n)),rest=caborList().filter(c=>ok(c)&&!used.has(c.n));
+  const sec=(t,l,k)=>l.length?`<h2 class="sec">${t} <span class="bd">${l.length} cabor</span></h2><div class="grid">${l.map(c=>card(c,k)).join('')}</div>`:'';
+  const h=(!ck||ck==='Beregu'?sec('👥 Cabang Olahraga Beregu',L.Beregu,'Beregu'):'')+(!ck||ck==='Perorangan'?sec('🧍 Cabang Olahraga Perorangan',L.Perorangan,'Perorangan'):'')+(!ck?sec('📋 Belum Dikategorikan',rest,''):'');
+  return h||'<p class="sub">Cabang olahraga tidak ditemukan.</p>'}
+function pick(i){cs=CL[i].n;ck=CL[i].k;ct='pert';lim=100;render()}
+function cDetail(){return ct==='pert'?pertView():athGrid(S.ath.filter(a=>a.c===cs&&(!ck||a.p.some(r=>r.Kategori===ck))))}
+function pertView(){const f=pertOf(cs).filter(p=>!ck||p.k===ck);
+  return f.length?`<p class="sub">${f.length} jenis pertandingan</p><div class="tw"><table><tr><th>Pertandingan</th><th>Kategori</th><th>Medali Porprov 2025</th></tr>${f.map(p=>`<tr><td>${esc(p.n)}</td><td>${esc(p.k)}</td><td>${mbadge(mcount(p.r))}</td></tr>`).join('')}</table></div>`:'<p class="sub">Belum ada data jenis pertandingan.</p>'}
+/* ---- Atlet ---- */
+function atlet(){const cl=caborList().map(c=>c.n);
+  return hd('Profil <span>Atlet</span>','Profil atlet KONI Hulu Sungai Utara','🏃 Atlet')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari nama atlet…" value="${esc(aq)}" oninput="aq=this.value;lim=100;upd()"><select onchange="ac=this.value;lim=100;upd()"><option value="">Semua Cabang Olahraga</option>${opt(cl,ac)}</select></div><div id="cl">${atBody()}</div></div>`}
+function atBody(){const q=aq.toLowerCase();return athGrid(S.ath.filter(a=>(!ac||a.c===ac)&&(!q||a.n.toLowerCase().includes(q))))}
+function athGrid(f){return f.length?`<p class="sub">${f.length} atlet</p><div class="grid g3">${f.slice(0,lim).map(a=>`<div class="card h ath" onclick="readAth(${S.ath.indexOf(a)})">${av(a)}<div><b>${esc(a.n)}</b><small>${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</small>${mbadge(mcount(a.p))}</div></div>`).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:'<p class="sub">Atlet tidak ditemukan.</p>'}
+function readAth(i){const a=S.ath[i];
+  openM(`<div class="fx" style="justify-content:flex-start;gap:16px;margin-bottom:16px">${av(a,1)}<div><h2 style="margin:0">${esc(a.n)}</h2><p style="color:var(--m)">${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</p></div></div>${mbadge(mcount(a.p))}<h3 style="margin:18px 0 6px">Prestasi Porprov 2025</h3>${a.p.length?a.p.map(r=>`<div class="pr"><div><b>${esc(r.Pertandingan)}</b><small>${esc(r.Kategori)}</small></div><span class="bd ${esc(r.Medali)}">${esc(r.Medali||'-')}</span></div>`).join(''):'<p class="sub">Belum ada data prestasi.</p>'}<br><button class="btn g" onclick="closeM()">Tutup</button>`)}
+/* ---- Prestasi Atlet > Porprov 2025 ---- */
+function filt(){const q=pq.toLowerCase();return S.atlet.filter(a=>MED.includes(a.Medali)&&(!pc||a.Cabor===pc)&&(!pm||a.Medali===pm)&&(!q||[a['Nama Atlet'],a.Pertandingan,a.Cabor].join(' ').toLowerCase().includes(q)))}
+function porprov(){const m=medals(),tot=m.Emas+m.Perak+m.Perunggu;
+  return hd('Prestasi Atlet · <span>Porprov 2025</span>','Daftar atlet Hulu Sungai Utara yang meraih medali pada Porprov 2025','🥇 Prestasi Atlet')+`<div class="w pg"><div class="stats" style="margin:0 0 24px">${[[tot,'Total Medali'],[m.Emas,'🥇 Emas'],[m.Perak,'🥈 Perak'],[m.Perunggu,'🥉 Perunggu']].map(x=>`<div class="st"><b>${x[0]}</b><span>${x[1]}</span></div>`).join('')}</div>
+  <div class="bar"><input placeholder="🔍 Cari atlet / pertandingan…" value="${esc(pq)}" oninput="pq=this.value;lim=100;upd()"><select onchange="pc=this.value;lim=100;upd()"><option value="">Semua Cabor</option>${opt(caborList().map(c=>c.n),pc)}</select><select onchange="pm=this.value;lim=100;upd()"><option value="">Semua Medali</option>${opt(MED,pm)}</select></div><div id="cl">${prBody()}</div></div>`}
+function prBody(){const f=filt();return `<p class="sub">${f.length} atlet peraih medali</p><div class="tw"><table><tr><th>No</th>${TABLE_COLS.map(c=>`<th>${c}</th>`).join('')}</tr>${f.slice(0,lim).map((a,n)=>`<tr><td>${n+1}</td>${TABLE_COLS.map(c=>`<td>${c==='Medali'?`<span class="bd ${esc(a[c])}">${esc(a[c])}</span>`:esc(a[c])}</td>`).join('')}</tr>`).join('')}</table></div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`}
+function csv(){const f=filt(),h=Object.keys(f[0]||{});const t=[h].concat(f.map(r=>h.map(k=>r[k]))).map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download='prestasi-porprov-2025.csv';a.click()}
+
+function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
+function closeM(){$('#mo').classList.remove('on')}
+load();
+</script>
+</body>
+</html>
