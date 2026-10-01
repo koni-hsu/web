@@ -36,7 +36,7 @@ nav .w{display:flex;align-items:center;justify-content:space-between;height:66px
 .tag{display:inline-block;padding:5px 13px;border-radius:99px;background:rgba(255,255,255,.12);font-size:12px;font-weight:600;margin-bottom:10px}
 .hero h1{font-size:clamp(28px,4.7vw,48px);font-weight:800;line-height:1.08;max-width:680px}
 .hero h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;color:transparent}
-.hero p{max-width:520px;margin:10px 0 17px;opacity:.8}
+.hero p{max-width:520px;margin:10px 0 0;opacity:.8}
 .btn{display:inline-block;border:0;padding:12px 24px;border-radius:99px;font-weight:700;background:var(--r);color:#fff;text-decoration:none;transition:.2s}
 .btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(200,16,46,.35)}
 .btn.o{background:rgba(255,255,255,.12);margin-left:8px}.btn.s{padding:7px 14px;font-size:13px}.btn.g{background:var(--bg);color:var(--t)}.btn.d{background:#fee;color:var(--r)}
@@ -151,7 +151,7 @@ body.nav-open:after{z-index:110!important}
 
 /* Logo hero tanpa latar putih */
 .hl{background:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important}
-.hl img{width:240px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.45))}
+.hl img{width:170px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.45))}
 .vid iframe{display:block;width:100%;height:560px;border:0;background:#000}.vid.yt iframe{height:auto;aspect-ratio:16/9}.igb{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,#7a0a1e,#1d3a8a);color:#fff;border-radius:18px;padding:16px 20px;margin-bottom:18px}.igb a{color:#fff}
 </style>
 </head>
@@ -234,8 +234,7 @@ function home(){
   const m=medals(),cb=caborList().length;
   return `<div class="hero"><div class="w"><div class="hl"><img src="${LOGO}" alt="Logo KONI HSU"></div><span class="tag">🏅 Komite Olahraga Nasional Indonesia</span>
   <h1>Membangun <span>Prestasi</span> Olahraga Hulu Sungai Utara</h1>
-  <p>Portal resmi informasi cabang olahraga, atlet berprestasi, dan berita terbaru KONI Kabupaten Hulu Sungai Utara.</p>
-  <a class="btn" onclick="go('cabor')">Lihat Cabang Olahraga</a><a class="btn o" onclick="go('profil')">Profil KONI</a></div></div>
+  <p>Portal resmi informasi cabang olahraga, atlet berprestasi, dan berita terbaru KONI Kabupaten Hulu Sungai Utara.</p></div></div>
   <div class="w"><div class="stats">
   ${[[cb,'Cabang Olahraga','🏟️'],[S.atlet.length,'Atlet Berprestasi','🏃'],[m.Emas,'Medali Emas','🥇'],[m.Perak,'Medali Perak','🥈'],[m.Perunggu,'Medali Perunggu','🥉']].map(x=>`<div class="st"><i>${x[2]}</i><b data-c="${x[0]}">0</b><span>${x[1]}</span></div>`).join('')}
   </div><p class="cap">🏅 <b>Prestasi Kontingen Hulu Sungai Utara pada Porprov 2025</b> · jumlah medali dihitung per atlet</p></div>
