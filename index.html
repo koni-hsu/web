@@ -101,7 +101,7 @@ td{padding:11px 14px;border-top:1px solid var(--b)}
 .tabs button{border:0;padding:10px 20px;border-radius:99px;background:#fff;font-weight:700;border:1px solid var(--b)}
 .tabs button.on{background:var(--r);color:#fff;border-color:var(--r)}
 .fx{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
-footer{background:var(--n);color:#fff;padding:16px 0;font-size:13px;line-height:1.4}footer .w{display:flex;justify-content:space-between;align-items:center;gap:14px 20px;flex-wrap:wrap}footer p{opacity:.7;font-size:12.5px}footer .fl{gap:12px;min-width:0;flex:1 1 320px}footer .fl b{font-size:14px;display:block;margin-bottom:2px}footer .fl p{max-width:640px}footer .w>p{white-space:nowrap;flex:none}
+footer{background:var(--n);color:#fff;padding:22px 0;border-top:1px solid #ffffff1a;font-size:13px;line-height:1.4}footer .w{display:flex;justify-content:space-between;align-items:center;gap:14px 20px;flex-wrap:wrap}footer p{opacity:.7;font-size:12.5px}footer .fl{gap:12px;min-width:0;flex:1 1 320px}footer .fl b{font-size:15px;display:block;margin-bottom:4px}footer .fl p{max-width:640px}footer .w>p{white-space:nowrap;flex:none}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--n);color:#fff;padding:12px 22px;border-radius:99px;z-index:200;display:none}
 .ld{text-align:center;padding:80px;color:var(--m)}
 .dd{position:relative}.dd>a{display:block}
@@ -166,7 +166,7 @@ body.nav-open:after{z-index:110!important}
   </div>
 </div></nav>
 <main id="app"><div class="sk"><div class="hb"></div><div class="ro"><div class="ci"></div><div class="ci"></div><div class="ci"></div><div class="ci"></div></div><div class="ln" style="width:60%"></div><div class="ln" style="width:85%"></div><div class="ln" style="width:70%"></div></div></main>
-<footer><div class="w"><div class="fl"><i><img data-logo alt="Logo KONI HSU"></i><div><b>KONI Kab. Hulu Sungai Utara</b><p id="ft"></p></div></div><p>© KONI HSU</p></div></footer>
+<footer><div class="w"><div class="fl"><div><b>KONI Kab. Hulu Sungai Utara</b><p id="ft"></p></div></div><p>© KONI HSU</p></div></footer>
 <div class="mo" id="mo" onclick="if(event.target===this)closeM()"><div class="mb" id="mb"></div></div>
 <div id="toast"></div>
 
@@ -184,7 +184,7 @@ const MK='Porprov 2025 (Medali)';
 let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',aq='',pc='',pm='',pq='',ck='',bq='';
 const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
-function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=(S.profil&&S.profil.alamat)||''}
+function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
 const CK='koni_hsu_data_v2';
 function load(){
   let cached=null,raw=null;
