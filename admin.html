@@ -134,6 +134,7 @@ const run=(fn,...a)=>api(fn,...a).catch(e=>{if(TOKEN&&/Sesi berakhir/.test(Strin
 const SITE=document.querySelector('.menu a').href;
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
 document.querySelectorAll('img[data-logo]').forEach(i=>i.src=LOGO);
+(function(){['icon','apple-touch-icon'].forEach(function(r){var l=document.querySelector('link[rel="'+r+'"]');if(!l){l=document.createElement('link');l.rel=r;document.head.appendChild(l)}l.href=LOGO})})(); // logo KONI sebagai ikon tab browser
 let A=null,TOKEN='',tab='Berita',aq='',UP=false;
 const MK='Porprov 2025 (Medali)';
 const OY=['Ya','Tidak'],KT=['Perorangan','Beregu'];

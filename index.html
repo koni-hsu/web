@@ -175,6 +175,7 @@ body.nav-open:after{z-index:110!important}
 <script>
 const $=s=>document.querySelector(s);
 document.querySelectorAll('img[data-logo]').forEach(i=>i.src=LOGO);
+(function(){['icon','apple-touch-icon'].forEach(function(r){var l=document.querySelector('link[rel="'+r+'"]');if(!l){l=document.createElement('link');l.rel=r;document.head.appendChild(l)}l.href=LOGO})})(); // logo KONI sebagai ikon tab browser
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const run=api;
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
