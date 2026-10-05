@@ -186,10 +186,10 @@ const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
 function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
 const CK='koni_hsu_data_v2';
-function load(){
+function load(bg){
   let cached=null,raw=null;
   try{raw=localStorage.getItem(CK);if(raw)cached=JSON.parse(raw)}catch(e){}
-  if(cached){try{applyData(cached)}catch(e){cached=null}}
+  if(cached&&!bg){try{applyData(cached)}catch(e){cached=null}}
   run('getData').then(d=>{
     let j=null;try{j=JSON.stringify(d)}catch(e){}
     if(j&&j===raw&&cached)return;
@@ -304,6 +304,8 @@ function csv(){const f=filt(),h=Object.keys(f[0]||{});const t=[h].concat(f.map(r
 function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
 function closeM(){$('#mo').classList.remove('on')}
 load();
+/* Saat tab kembali aktif, ambil data terbaru di latar belakang (tanpa reload halaman) */
+let lastF=Date.now();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastF>30000){lastF=Date.now();load(true)}});
 </script>
 </body>
 </html>
