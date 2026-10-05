@@ -140,18 +140,20 @@ const MK='Porprov 2025 (Medali)';
 const OY=['Ya','Tidak'],KT=['Perorangan','Beregu'];
 const FORM={
  Berita:[['Judul'],['Ringkasan'],['Isi','t'],['Gambar','i'],['Link Video'],['Tanggal','d'],['Kategori','s',['Artikel','Media']],['Status','s',['Terbit','Draft']]],
- Cabor:[['Nama Cabor'],['Ketua Cabor'],['Pendamping']],
+ Cabor:[['Nama Cabor'],['Kategori','kc'],['Ketua Cabor'],['Pendamping']],
+ KategoriCabor:[['Nama Kategori']],
  Pertandingan:[['Cabor','c'],['Nama Pertandingan'],['Kategori','s',KT]],
  DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['NIK KTP','n'],['Foto KTP','k'],['Foto Profil','i']],
  Atlet:[['Cabor','c'],['Pertandingan','p'],['Nama Atlet','a'],['Kategori','s',KT],['Medali','s',['','Emas','Perak','Perunggu']],['Atelet Porprov 2022','s',OY],['Prestasi Porprov 2022','s',OY],[MK]]
 };
 const CFG={
- Cabor:{k:'ID',dk:'cabor',t:'Master Cabang Olahraga',d:'Daftar cabang olahraga beserta ketua dan pendamping — dipakai sebagai pilihan pada menu lainnya',add:'Cabor',cols:['Nama Cabor','Ketua Cabor','Pendamping'],sort:1},
+ Cabor:{k:'ID',dk:'cabor',t:'Master Cabang Olahraga',d:'Daftar cabang olahraga beserta ketua dan pendamping — dipakai sebagai pilihan pada menu lainnya',add:'Cabor',cols:['Nama Cabor','Kategori','Ketua Cabor','Pendamping'],sk:['Nama Cabor'],sort:1},
+ KategoriCabor:{k:'ID',dk:'kategoricabor',t:'Kategori Cabor',d:'Kategori cabang olahraga (mis. Akurasi, Bela Diri, Permainan, Terukur). Tambahkan kategori baru di sini; kategori yang masih dipakai cabor tidak bisa dihapus',add:'Kategori',cols:['Nama Kategori'],sk:['Nama Kategori'],sort:1},
  Pertandingan:{k:'ID',dk:'pertandingan',t:'Jenis Pertandingan',d:'Nomor / jenis pertandingan pada tiap cabang olahraga',add:'Pertandingan',cols:['Cabor','Nama Pertandingan','Kategori'],sort:1},
  DataAtlet:{k:'ID',dk:'dataatlet',t:'Data Atlet',d:'Master data atlet. Foto Profil tampil di website; NIK KTP dan Foto KTP bersifat privat (hanya terlihat di halaman admin ini)',add:'Atlet',cols:['Foto Profil','Nama Atlet','Cabor','Jenis Kelamin','NIK KTP','Foto KTP'],sk:['Nama Atlet','Cabor'],q:['Nama Atlet','Cabor','Jenis Kelamin','NIK KTP'],sort:1},
  Atlet:{k:'No',dk:'atlet',t:'Prestasi Atlet Porprov 2025',d:'Data prestasi atlet pada Porprov 2025 — tampil di halaman Cabang Olahraga website',add:'Prestasi',cols:['Nama Atlet','Cabor','Pertandingan','Medali']}
 };
-const MENU=[['Berita','📰','Berita','Kelola berita yang tampil di menu Berita website'],['Profil','👥','Profil','Kelola visi, misi, sejarah, struktur organisasi, dan kontak'],['-','Cabang Olahraga'],['Cabor','🏟️','Master Cabor',CFG.Cabor.d],['Pertandingan','🎯','Jenis Pertandingan',CFG.Pertandingan.d],['DataAtlet','🏃','Data Atlet',CFG.DataAtlet.d],['Atlet','🏅','Prestasi Porprov 2025',CFG.Atlet.d]];
+const MENU=[['Berita','📰','Berita','Kelola berita yang tampil di menu Berita website'],['Profil','👥','Profil','Kelola visi, misi, sejarah, struktur organisasi, dan kontak'],['-','Cabang Olahraga'],['Cabor','🏟️','Master Cabor',CFG.Cabor.d],['KategoriCabor','🗂️','Kategori Cabor',CFG.KategoriCabor.d],['Pertandingan','🎯','Jenis Pertandingan',CFG.Pertandingan.d],['DataAtlet','🏃','Data Atlet',CFG.DataAtlet.d],['Atlet','🏅','Prestasi Porprov 2025',CFG.Atlet.d]];
 
 const PF=[['visi','Visi','t'],['misi','Misi (satu baris = satu poin)','t'],['sejarah','Sejarah / Tentang','t'],['struktur','Struktur Organisasi (format: Jabatan | Nama, satu per baris)','t'],['alamat','Alamat'],['telepon','Telepon'],['email','Email']];
 function toggleAdminDrawer(){document.body.classList.toggle('admin-nav-open')}
@@ -181,7 +183,15 @@ function aList(t){const c=CFG[t],q=aq.toLowerCase(),sk=c.sk||[c.cols[0],c.cols[1
   const hd=k=>k==='Foto Profil'?'Foto':k;
   return `<div class="bar"><input placeholder="🔍 Cari…" value="${esc(aq)}" onchange="aq=this.value;render()"><button class="btn s" onclick="edit('${t}')">＋ Tambah ${c.add}</button></div><p class="sub">${f.length} data${f.length>100?' (menampilkan 100 teratas — gunakan pencarian)':''}</p><div class="tw"><table><tr>${c.cols.map(k=>`<th>${hd(k)}</th>`).join('')}<th></th></tr>${f.slice(0,100).map(r=>`<tr>${c.cols.map(k=>`<td>${cell(k,r)}</td>`).join('')}<td style="white-space:nowrap">${btns(t,r[c.k])}</td></tr>`).join('')}</table></div>`}
 function aProfil(){return `<div class="box">${PF.map(([k,l,t])=>`<div class="fg"><label>${l}</label>${t?`<textarea rows="4" id="pf_${k}">${esc(A.profil[k])}</textarea>`:`<input id="pf_${k}" value="${esc(A.profil[k])}">`}</div>`).join('')}<button class="btn" id="btnPf" onclick="saveProfil()">Simpan Profil</button></div>`}
-async function saveProfil(){const b=$('#btnPf');b.disabled=true;try{for(const [k] of PF)await run('saveRow',TOKEN,'Profil',{Kunci:k,Nilai:$('#pf_'+k).value});toast('Profil tersimpan');refresh()}catch(e){toast(e.message);const x=$('#btnPf');if(x)x.disabled=false}}
+function saveProfil(){const b=$('#btnPf'),rows=PF.map(([k])=>({Kunci:k,Nilai:$('#pf_'+k).value})).filter(r=>r.Nilai!==String(A.profil[r.Kunci]==null?'':A.profil[r.Kunci]));
+  if(!rows.length)return toast('Tidak ada perubahan');
+  b.disabled=true;b.innerHTML='<span class="spin"></span>Menyimpan…';
+  run('saveRows',TOKEN,'Profil',rows).then(()=>{rows.forEach(r=>A.profil[r.Kunci]=r.Nilai);toast('Profil tersimpan');const x=$('#btnPf');if(x){x.disabled=false;x.textContent='Simpan Profil'}}).catch(e=>{toast(e.message);const x=$('#btnPf');if(x){x.disabled=false;x.textContent='Simpan Profil'}})}
+const katNames=()=>(A.kategoricabor||[]).map(k=>k['Nama Kategori']).filter(Boolean);
+function addKat(){const n=(prompt('Nama kategori baru:')||'').trim();if(!n)return;
+  if(katNames().some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Kategori sudah ada');
+  const o={ID:'','Nama Kategori':n};toast('Menambah kategori…');
+  run('saveRow',TOKEN,'KategoriCabor',o).then(id=>{o.ID=id;localPut('KategoriCabor',o);const s=$('#mb [data-k="Kategori"]');if(s)s.innerHTML=opts(['',...katNames()],n);toast('Kategori ditambahkan')}).catch(e=>toast(e.message))}
 const cabNames=()=>A.cabor.map(c=>c['Nama Cabor']).filter(Boolean).sort((a,b)=>a.localeCompare(b));
 const pertNames=cab=>[...new Set(A.pertandingan.filter(p=>!cab||p.Cabor===cab).map(p=>p['Nama Pertandingan']))].sort((a,b)=>a.localeCompare(b));
 const athOpts=cab=>A.dataatlet.filter(a=>!cab||a.Cabor===cab).map(a=>`<option value="${esc(a['Nama Atlet'])}">`).join('');
@@ -197,20 +207,32 @@ function edit(n,id){
     else if(t==='c')inp=`<select data-k="${k}" ${n==='Atlet'?'onchange="cabChg()"':''}>${opts(['',...cabNames()],v)}</select>`;
     else if(t==='p')inp=`<select data-k="${k}" id="fp" onchange="pertChg()">${opts(['',...pertNames(cab)],v)}</select>`;
     else if(t==='a')inp=`<input data-k="${k}" list="dl" value="${esc(v)}" placeholder="Ketik atau pilih dari Data Atlet"><datalist id="dl">${athOpts(cab)}</datalist>`;
+    else if(t==='kc')inp=`<select data-k="${k}">${opts(['',...katNames()],v)}</select><button type="button" class="btn s g" style="margin-top:8px" onclick="addKat()">＋ Tambah kategori baru</button>`;
     else if(t==='s')inp=`<select data-k="${k}">${opts(o,v)}</select>`;
     else inp=`<input ${t==='d'?'type="date"':''} data-k="${k}" value="${esc(v)}">`;
     return `<div class="fg"><label>${k}</label>${inp}</div>`}).join('');
-  openM(`<h2 style="margin-bottom:16px">${id?'Edit':'Tambah'} ${c.add||'Berita'}</h2>${fld}<div class="fx"><button class="btn g" onclick="closeM()">Batal</button><button class="btn" onclick="saveF('${n}','${id?esc(id):''}')">Simpan</button></div>`);if(r['Foto KTP'])loadKtp(r['Foto KTP'])}
+  openM(`<h2 style="margin-bottom:16px">${id?'Edit':'Tambah'} ${c.add||'Berita'}</h2>${fld}<div class="fx"><button class="btn g" onclick="closeM()">Batal</button><button class="btn" id="btnSv" onclick="saveF('${n}','${id?esc(id):''}')">Simpan</button></div>`);if(r['Foto KTP'])loadKtp(r['Foto KTP'])}
 function saveF(n,id){if(UP)return toast('Tunggu, foto sedang diunggah');const c=CFG[n]||{k:'ID'},o={};o[c.k]=id;document.querySelectorAll('#mb [data-k]').forEach(e=>o[e.dataset.k]=e.value);
   if(n==='Berita')o.Gambar=driveImg(o.Gambar);
-  const need={Berita:'Judul',Cabor:'Nama Cabor',Pertandingan:'Nama Pertandingan',DataAtlet:'Nama Atlet',Atlet:'Nama Atlet'}[n];if(!String(o[need]||'').trim())return toast(need+' wajib diisi');
+  const need={KategoriCabor:'Nama Kategori',Berita:'Judul',Cabor:'Nama Cabor',Pertandingan:'Nama Pertandingan',DataAtlet:'Nama Atlet',Atlet:'Nama Atlet'}[n];if(!String(o[need]||'').trim())return toast(need+' wajib diisi');
   if(n==='DataAtlet'&&o['NIK KTP']&&!/^\d{16}$/.test(o['NIK KTP']))return toast('NIK KTP harus 16 digit angka');
-  run('saveRow',TOKEN,n,o).then(()=>{closeM();toast('Tersimpan');refresh()}).catch(e=>toast(e.message))}
+  const oldKat=n==='KategoriCabor'&&id?((A.kategoricabor||[]).find(x=>String(x.ID)===String(id))||{})['Nama Kategori']:null;
+  const sv=$('#btnSv');if(sv){if(sv.disabled)return;sv.disabled=true;sv.innerHTML='<span class="spin"></span>Menyimpan…'}
+  run('saveRow',TOKEN,n,o).then(rid=>{o[c.k]=rid;localPut(n,o);if(oldKat&&oldKat!==o['Nama Kategori'])A.cabor.forEach(x=>{if(x.Kategori===oldKat)x.Kategori=o['Nama Kategori']});closeM();toast('Tersimpan');render()}).catch(e=>{toast(e.message);const x=$('#btnSv');if(x){x.disabled=false;x.textContent='Simpan'}})}
+/* Perbarui data lokal langsung (tanpa mengunduh ulang seluruh data dari server) */
+function localPut(n,o){const c=CFG[n]||{k:'ID',dk:'berita'},L=A[c.dk],i=L.findIndex(x=>String(x[c.k])===String(o[c.k]));if(i>=0)L[i]=Object.assign({},L[i],o);else L.push(o);
+  if(n==='Berita')L.sort((a,b)=>String(b.Tanggal).localeCompare(String(a.Tanggal)))}
 function driveImg(u){const m=String(u).match(/drive\.google\.com\/file\/d\/([^\/]+)/);return m?'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w1000':u}
 let ASK=null;
 function ask(msg){return new Promise(ok=>{ASK=ok;openM(`<h2 style="margin-bottom:10px">Konfirmasi</h2><p style="margin-bottom:20px">${esc(msg)}</p><div class="fx"><button class="btn g" onclick="askR(false)">Batal</button><button class="btn d" onclick="askR(true)">Ya, Hapus</button></div>`)})}
 function askR(v){const f=ASK;ASK=null;closeM();f&&f(v)}
-async function del(n,id){if(!await ask('Hapus data ini? Tindakan ini tidak dapat dibatalkan.'))return;run('deleteRow',TOKEN,n,id).then(()=>{toast('Dihapus');refresh()}).catch(e=>toast(e.message))}
+async function del(n,id){
+  const c=CFG[n]||{k:'ID',dk:'berita'},L=A[c.dk];
+  if(n==='KategoriCabor'){const k=L.find(x=>String(x[c.k])===String(id));if(k){const nm=k['Nama Kategori'],u=A.cabor.filter(x=>x.Kategori===nm).length;if(u)return toast('Kategori "'+nm+'" masih dipakai '+u+' cabor. Ubah kategori cabor tersebut dulu.')}}
+  if(!await ask('Hapus data ini? Tindakan ini tidak dapat dibatalkan.'))return;
+  const i=L.findIndex(x=>String(x[c.k])===String(id));
+  if(i>=0)L.splice(i,1);render();toast('Menghapus…'); // tampilan langsung diperbarui, server menyusul
+  run('deleteRow',TOKEN,n,id).then(()=>toast('Dihapus')).catch(e=>{toast(e.message);refresh()})}
 function refresh(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>toast(e.message))}
 
 const sid=k=>k.replace(/\W/g,'');
