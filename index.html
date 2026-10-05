@@ -161,7 +161,7 @@ body.nav-open:after{z-index:110!important}
   <div class="logo" onclick="go('home')"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>KONI<small>Kab. Hulu Sungai Utara</small></div></div>
   <div class="menu">
     <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><div class="dd"><a class="dt" data-p="berita,artikel,media" onclick="this.parentNode.classList.toggle('open')">Berita ▾</a><div class="dm"><a data-p="artikel" onclick="go('artikel')">📰 Artikel</a><a data-p="media" onclick="go('media')">🎬 Media</a></div></div>
-    <div class="dd"><a class="dt" data-p="cabor,atlet" onclick="this.parentNode.classList.toggle('open')">Cabor &amp; Atlet ▾</a><div class="dm"><a data-p="cabor" onclick="go('cabor')">🏟️ Cabang Olahraga</a><a data-p="atlet" onclick="go('atlet')">🏃 Atlet</a></div></div>
+    <a data-p="cabor" onclick="go('cabor')">Cabor</a><a data-p="atlet" onclick="go('atlet')">Atlet</a>
     <div class="dd"><a class="dt" data-p="porprov" onclick="this.parentNode.classList.toggle('open')">Prestasi Atlet ▾</a><div class="dm"><a data-p="porprov" onclick="go('porprov')">🏅 Porprov 2025</a></div></div>
   </div>
 </div></nav>
@@ -181,10 +181,10 @@ const run=api;
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
 const lines=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
 const MK='Porprov 2025 (Medali)';
-let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',aq='',pc='',pm='',pq='',ck='',bq='';
+let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',aq='',pc='',pm='',pq='',ck='',bq='',kc='';
 const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
-function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
+function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.kategoricabor=S.kategoricabor||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
 const CK='koni_hsu_data_v2';
 function load(bg){
   let cached=null,raw=null;
@@ -224,7 +224,7 @@ function pertOf(cab){const m={};S.pertandingan.filter(p=>p.Cabor===cab).forEach(
   return Object.values(m).sort((a,b)=>a.n.localeCompare(b.n))}
 const av=(a,b)=>`<div class="av${b?' big':''}"${a.f?` style="background:url('${esc(a.f)}') center/cover"`:''}>${a.f?'':esc(ini(a.n))}</div>`;
 const kpOf=n=>S.cabor.find(c=>c['Nama Cabor']===n)||{};
-const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div><div><small>🤝 Pendamping</small><b>${esc(String(c.Pendamping||'').trim()||'-')}</b></div></div>`};
+const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div><div><small>🤝 Pendamping</small><b>${esc(String(c.Pendamping||'').trim()||'-')}</b></div>${String(c.Kategori||'').trim()?`<div><small>🏷️ Kategori</small><b>${esc(String(c.Kategori).trim())}</b></div>`:''}</div>`};
 const KAT=['Beregu','Perorangan'],hasD=c=>c.pt>0||c.a>0;
 const caborList=kat=>{const m={};S.cabor.forEach(c=>c['Nama Cabor']&&(m[c['Nama Cabor']]=1));S.atlet.forEach(r=>r.Cabor&&(m[r.Cabor]=1));
   return Object.keys(m).sort((a,b)=>a.localeCompare(b)).map(n=>({n,pt:pertOf(n).filter(p=>!kat||p.k===kat).length,a:S.ath.filter(x=>x.c===n&&(!kat||x.p.some(r=>r.Kategori===kat))).length,m:mcount(S.atlet.filter(r=>r.Cabor===n&&(!kat||r.Kategori===kat)))}))};
@@ -273,8 +273,9 @@ function cabor(){
     ${ks.length>1?chips([['','Semua'],...ks.map(k=>[k,k])],ck,'setCk'):''}
     <div class="tabs">${[['pert','🎯 Jenis Pertandingan'],['atlet','🏃 Atlet']].map(([k,l])=>`<button class="${ct===k?'on':''}" onclick="ct='${k}';lim=100;render()">${l}</button>`).join('')}</div><div id="cl">${cDetail()}</div></div>`}
   const nb=caborList('Beregu').filter(hasD).length,np=caborList('Perorangan').filter(hasD).length;
-  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beregu dan perorangan beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg">${chips([['','Semua'],['Beregu',`👥 Beregu (${nb})`],['Perorangan',`🧍 Perorangan (${np})`]],ck,'setCk')}<div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"></div><div id="cl">${cList()}</div></div>`}
-function cList(){const q=cq.toLowerCase(),ok=c=>c.n.toLowerCase().includes(q);CL=[];
+  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beregu dan perorangan beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg">${chips([['','Semua'],['Beregu',`👥 Beregu (${nb})`],['Perorangan',`🧍 Perorangan (${np})`]],ck,'setCk')}<div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"><select onchange="kc=this.value;upd()"><option value="">Semua Kategori</option>${opt(katList(),kc)}</select></div><div id="cl">${cList()}</div></div>`}
+const katList=()=>{const m=S.kategoricabor.map(k=>String(k['Nama Kategori']||'').trim()).filter(Boolean);S.cabor.forEach(c=>{const k=String(c.Kategori||'').trim();if(k&&!m.includes(k))m.push(k)});return m};
+function cList(){const q=cq.toLowerCase(),ok=c=>c.n.toLowerCase().includes(q)&&(!kc||String(kpOf(c.n).Kategori||'').trim()===kc);CL=[];
   const card=(c,k)=>{CL.push({n:c.n,k});return `<div class="card h cb" onclick="pick(${CL.length-1})"><h3>${esc(c.n)}</h3><div class="md"><span class="bd">🏃 ${c.a} atlet</span><span class="bd">🎯 ${c.pt} pertandingan</span></div>${kpInfo(c.n)}</div>`};
   const L={Beregu:caborList('Beregu').filter(c=>hasD(c)&&ok(c)),Perorangan:caborList('Perorangan').filter(c=>hasD(c)&&ok(c))};
   const used=new Set([...L.Beregu,...L.Perorangan].map(c=>c.n)),rest=caborList().filter(c=>ok(c)&&!used.has(c.n));
