@@ -143,14 +143,14 @@ const FORM={
  Cabor:[['Nama Cabor'],['Kategori','kc'],['Ketua Cabor']],
  KategoriCabor:[['Nama Kategori']],
  Pertandingan:[['Cabor','c'],['Nama Pertandingan'],['Kategori','s',KT]],
- DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['NIK KTP','n'],['Foto KTP','k'],['Foto Profil','i']],
+ DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['Foto Profil','i']],
  Atlet:[['Cabor','c'],['Pertandingan','p'],['Nama Atlet','a'],['Kategori','s',KT],['Medali','s',['','Emas','Perak','Perunggu']],['Atelet Porprov 2022','s',OY],['Prestasi Porprov 2022','s',OY],[MK]]
 };
 const CFG={
  Cabor:{k:'ID',dk:'cabor',t:'Master Cabang Olahraga',d:'Daftar cabang olahraga beserta ketua — dipakai sebagai pilihan pada menu lainnya',add:'Cabor',cols:['Nama Cabor','Kategori','Ketua Cabor'],sk:['Nama Cabor'],sort:1},
  KategoriCabor:{k:'ID',dk:'kategoricabor',t:'Kategori Cabor',d:'Kategori cabang olahraga (mis. Akurasi, Bela Diri, Permainan, Terukur). Tambahkan kategori baru di sini; kategori yang masih dipakai cabor tidak bisa dihapus',add:'Kategori',cols:['Nama Kategori'],sk:['Nama Kategori'],sort:1},
  Pertandingan:{k:'ID',dk:'pertandingan',t:'Jenis Pertandingan',d:'Nomor / jenis pertandingan pada tiap cabang olahraga',add:'Pertandingan',cols:['Cabor','Nama Pertandingan','Kategori'],sort:1},
- DataAtlet:{k:'ID',dk:'dataatlet',t:'Data Atlet',d:'Master data atlet. Foto Profil tampil di website; NIK KTP dan Foto KTP bersifat privat (hanya terlihat di halaman admin ini)',add:'Atlet',cols:['Foto Profil','Nama Atlet','Cabor','Jenis Kelamin','NIK KTP','Foto KTP'],sk:['Nama Atlet','Cabor'],q:['Nama Atlet','Cabor','Jenis Kelamin','NIK KTP'],sort:1},
+ DataAtlet:{k:'ID',dk:'dataatlet',t:'Data Atlet',d:'Master data atlet. Foto Profil tampil di website',add:'Atlet',cols:['Foto Profil','Nama Atlet','Cabor','Jenis Kelamin'],sk:['Nama Atlet','Cabor'],q:['Nama Atlet','Cabor','Jenis Kelamin'],sort:1},
  Atlet:{k:'No',dk:'atlet',t:'Prestasi Atlet Porprov 2025',d:'Data prestasi atlet pada Porprov 2025 — tampil di halaman Cabang Olahraga website',add:'Prestasi',cols:['Nama Atlet','Cabor','Pertandingan','Medali']}
 };
 const MENU=[['Berita','📰','Berita','Kelola berita yang tampil di menu Berita website'],['Profil','👥','Profil','Kelola visi, misi, sejarah, struktur organisasi, dan kontak'],['-','Cabang Olahraga'],['Cabor','🏟️','Master Cabor',CFG.Cabor.d],['KategoriCabor','🗂️','Kategori Cabor',CFG.KategoriCabor.d],['Pertandingan','🎯','Jenis Pertandingan',CFG.Pertandingan.d],['DataAtlet','🏃','Data Atlet',CFG.DataAtlet.d],['Atlet','🏅','Prestasi Porprov 2025',CFG.Atlet.d]];
@@ -176,7 +176,6 @@ const btns=(n,id)=>`<button class="btn s g" onclick="edit('${n}','${esc(id)}')">
 const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function cell(k,r){
   if(k==='Foto Profil'){const v=r[k];return v?`<div class="th" style="background-image:url('${esc(v)}')"></div>`:`<div class="th">${esc(ini(r['Nama Atlet']))}</div>`}
-  if(k==='Foto KTP')return r[k]?'<span class="ok">✓ Ada</span>':'<span class="no">— Belum</span>';
   return esc(r[k])}
 function aList(t){const c=CFG[t],q=aq.toLowerCase(),sk=c.sk||[c.cols[0],c.cols[1]],qk=c.q||c.cols;let f=A[c.dk].filter(r=>!q||qk.map(k=>r[k]).join(' ').toLowerCase().includes(q));
   if(c.sort)f=f.slice().sort((a,b)=>sk.map(k=>a[k]).join('|').localeCompare(sk.map(k=>b[k]).join('|')));
@@ -201,8 +200,7 @@ function pertChg(){const cab=$('#mb [data-k="Cabor"]').value,p=$('#fp').value,m=
 function edit(n,id){
   const c=CFG[n]||{k:'ID',dk:'berita'},r=id?A[c.dk].find(x=>String(x[c.k])===String(id)):{},cab=r.Cabor||'';
   const fld=FORM[n].map(([k,t,o])=>{const v=r[k]==null?(k==='Tanggal'&&n==='Berita'?new Date().toISOString().slice(0,10):''):r[k];let inp;
-    if(t==='i'||t==='k')inp=imgField(k,v,t==='k'?'ktp':n==='Berita'?'berita':'profil');
-    else if(t==='n')inp=`<input data-k="${k}" inputmode="numeric" placeholder="16 digit NIK" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,16)" value="${esc(v)}">`;
+    if(t==='i')inp=imgField(k,v,n==='Berita'?'berita':'profil');
     else if(t==='t')inp=`<textarea rows="5" data-k="${k}">${esc(v)}</textarea>`;
     else if(t==='c')inp=`<select data-k="${k}" ${n==='Atlet'?'onchange="cabChg()"':''}>${opts(['',...cabNames()],v)}</select>`;
     else if(t==='p')inp=`<select data-k="${k}" id="fp" onchange="pertChg()">${opts(['',...pertNames(cab)],v)}</select>`;
@@ -211,11 +209,10 @@ function edit(n,id){
     else if(t==='s')inp=`<select data-k="${k}">${opts(o,v)}</select>`;
     else inp=`<input ${t==='d'?'type="date"':''} data-k="${k}" value="${esc(v)}">`;
     return `<div class="fg"><label>${k}</label>${inp}</div>`}).join('');
-  openM(`<h2 style="margin-bottom:16px">${id?'Edit':'Tambah'} ${c.add||'Berita'}</h2>${fld}<div class="fx"><button class="btn g" onclick="closeM()">Batal</button><button class="btn" id="btnSv" onclick="saveF('${n}','${id?esc(id):''}')">Simpan</button></div>`);if(r['Foto KTP'])loadKtp(r['Foto KTP'])}
+  openM(`<h2 style="margin-bottom:16px">${id?'Edit':'Tambah'} ${c.add||'Berita'}</h2>${fld}<div class="fx"><button class="btn g" onclick="closeM()">Batal</button><button class="btn" id="btnSv" onclick="saveF('${n}','${id?esc(id):''}')">Simpan</button></div>`)}
 function saveF(n,id){if(UP)return toast('Tunggu, foto sedang diunggah');const c=CFG[n]||{k:'ID'},o={};o[c.k]=id;document.querySelectorAll('#mb [data-k]').forEach(e=>o[e.dataset.k]=e.value);
   if(n==='Berita')o.Gambar=driveImg(o.Gambar);
   const need={KategoriCabor:'Nama Kategori',Berita:'Judul',Cabor:'Nama Cabor',Pertandingan:'Nama Pertandingan',DataAtlet:'Nama Atlet',Atlet:'Nama Atlet'}[n];if(!String(o[need]||'').trim())return toast(need+' wajib diisi');
-  if(n==='DataAtlet'&&o['NIK KTP']&&!/^\d{16}$/.test(o['NIK KTP']))return toast('NIK KTP harus 16 digit angka');
   const oldKat=n==='KategoriCabor'&&id?((A.kategoricabor||[]).find(x=>String(x.ID)===String(id))||{})['Nama Kategori']:null;
   const sv=$('#btnSv');if(sv){if(sv.disabled)return;sv.disabled=true;sv.innerHTML='<span class="spin"></span>Menyimpan…'}
   run('saveRow',TOKEN,n,o).then(rid=>{o[c.k]=rid;localPut(n,o);if(oldKat&&oldKat!==o['Nama Kategori'])A.cabor.forEach(x=>{if(x.Kategori===oldKat)x.Kategori=o['Nama Kategori']});closeM();toast('Tersimpan');render()}).catch(e=>{toast(e.message);const x=$('#btnSv');if(x){x.disabled=false;x.textContent='Simpan'}})}
@@ -236,17 +233,16 @@ async function del(n,id){
 function refresh(){run('getAdminData',TOKEN).then(d=>{A=d;render()}).catch(e=>toast(e.message))}
 
 const sid=k=>k.replace(/\W/g,'');
-function imgField(k,v,jn){const i=sid(k),ktp=jn==='ktp';return `<div><div class="pv" id="pv${i}" style="${v&&!ktp?`background-image:url('${esc(v)}')`:''}">${v?(ktp?'Memuat foto…':''):'Belum ada foto'}</div><input type="hidden" data-k="${k}" id="gm${i}" value="${esc(v)}"><div class="fx" style="justify-content:flex-start"><label class="btn s g" style="cursor:pointer">📷 Pilih Foto<input type="file" accept="image/*" hidden onchange="pickImg(this,'${k}','${jn}')"></label><button type="button" class="btn s d" onclick="setImg('${k}','')">Hapus Foto</button><small id="ust${i}" style="color:var(--m)"></small></div>${ktp?'<small style="color:var(--m)">🔒 Privat — hanya terlihat di halaman admin</small>':''}${jn==='berita'?`<input placeholder="atau tempel URL gambar (opsional)" onchange="setImg('${k}',driveImg(this.value.trim()))" style="margin-top:10px;font-size:13px">`:''}</div>`}
+function imgField(k,v,jn){const i=sid(k);return `<div><div class="pv" id="pv${i}" style="${v?`background-image:url('${esc(v)}')`:''}">${v?'':'Belum ada foto'}</div><input type="hidden" data-k="${k}" id="gm${i}" value="${esc(v)}"><div class="fx" style="justify-content:flex-start"><label class="btn s g" style="cursor:pointer">📷 Pilih Foto<input type="file" accept="image/*" hidden onchange="pickImg(this,'${k}','${jn}')"></label><button type="button" class="btn s d" onclick="setImg('${k}','')">Hapus Foto</button><small id="ust${i}" style="color:var(--m)"></small></div>${jn==='berita'?`<input placeholder="atau tempel URL gambar (opsional)" onchange="setImg('${k}',driveImg(this.value.trim()))" style="margin-top:10px;font-size:13px">`:''}</div>`}
 function setImg(k,u,disp){const i=sid(k);$('#gm'+i).value=u;const pv=$('#pv'+i),d=disp||u;pv.style.backgroundImage=d?`url('${d}')`:'none';pv.textContent=d?'':'Belum ada foto'}
-function loadKtp(id){run('getFotoKtp',TOKEN,id).then(d=>{const pv=$('#pvFotoKTP');if(pv){pv.style.backgroundImage=`url('${d}')`;pv.textContent=''}}).catch(()=>{const pv=$('#pvFotoKTP');if(pv)pv.textContent='Foto tidak bisa dimuat'})}
 function pickImg(inp,k,jn){const f=inp.files[0];if(!f)return;const i=sid(k);
   if(!f.type.startsWith('image/'))return toast('File harus berupa gambar');
   UP=true;$('#ust'+i).textContent='Memproses…';
   const img=new Image,url=URL.createObjectURL(f);
-  img.onload=()=>{const M=jn==='ktp'?1600:1200,r=Math.min(1,M/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);
+  img.onload=()=>{const M=1200,r=Math.min(1,M/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);
     const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
     const d=c.toDataURL('image/jpeg',.85);$('#ust'+i).textContent='Mengunggah…';
-    run('uploadFoto',TOKEN,d,f.name,jn).then(u=>{setImg(k,u,jn==='ktp'?d:u);$('#ust'+i).textContent='Terunggah ✓'}).catch(e=>{$('#ust'+i).textContent='';toast(e.message)}).finally(()=>{UP=false;inp.value=''})};
+    run('uploadFoto',TOKEN,d,f.name,jn).then(u=>{setImg(k,u);$('#ust'+i).textContent='Terunggah ✓'}).catch(e=>{$('#ust'+i).textContent='';toast(e.message)}).finally(()=>{UP=false;inp.value=''})};
   img.onerror=()=>{UP=false;$('#ust'+i).textContent='';toast('Gambar tidak bisa dibaca')};img.src=url}
 function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
 function closeM(){const f=ASK;ASK=null;$('#mo').classList.remove('on');f&&f(false)}
