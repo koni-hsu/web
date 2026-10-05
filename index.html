@@ -224,7 +224,7 @@ function pertOf(cab){const m={};S.pertandingan.filter(p=>p.Cabor===cab).forEach(
   return Object.values(m).sort((a,b)=>a.n.localeCompare(b.n))}
 const av=(a,b)=>`<div class="av${b?' big':''}"${a.f?` style="background:url('${esc(a.f)}') center/cover"`:''}>${a.f?'':esc(ini(a.n))}</div>`;
 const kpOf=n=>S.cabor.find(c=>c['Nama Cabor']===n)||{};
-const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div><div><small>🤝 Pendamping</small><b>${esc(String(c.Pendamping||'').trim()||'-')}</b></div>${String(c.Kategori||'').trim()?`<div><small>🏷️ Kategori</small><b>${esc(String(c.Kategori).trim())}</b></div>`:''}</div>`};
+const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div>${String(c.Kategori||'').trim()?`<div><small>🏷️ Kategori</small><b>${esc(String(c.Kategori).trim())}</b></div>`:''}</div>`};
 const KAT=['Beregu','Perorangan'],hasD=c=>c.pt>0||c.a>0;
 const caborList=kat=>{const m={};S.cabor.forEach(c=>c['Nama Cabor']&&(m[c['Nama Cabor']]=1));S.atlet.forEach(r=>r.Cabor&&(m[r.Cabor]=1));
   return Object.keys(m).sort((a,b)=>a.localeCompare(b)).map(n=>({n,pt:pertOf(n).filter(p=>!kat||p.k===kat).length,a:S.ath.filter(x=>x.c===n&&(!kat||x.p.some(r=>r.Kategori===kat))).length,m:mcount(S.atlet.filter(r=>r.Cabor===n&&(!kat||r.Kategori===kat)))}))};
