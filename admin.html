@@ -140,14 +140,14 @@ const MK='Porprov 2025 (Medali)';
 const OY=['Ya','Tidak'],KT=['Perorangan','Beregu'];
 const FORM={
  Berita:[['Judul'],['Ringkasan'],['Isi','t'],['Gambar','i'],['Link Video'],['Tanggal','d'],['Kategori','s',['Artikel','Media']],['Status','s',['Terbit','Draft']]],
- Cabor:[['Nama Cabor'],['Kategori','kc'],['Ketua Cabor'],['Pendamping']],
+ Cabor:[['Nama Cabor'],['Kategori','kc'],['Ketua Cabor']],
  KategoriCabor:[['Nama Kategori']],
  Pertandingan:[['Cabor','c'],['Nama Pertandingan'],['Kategori','s',KT]],
  DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['NIK KTP','n'],['Foto KTP','k'],['Foto Profil','i']],
  Atlet:[['Cabor','c'],['Pertandingan','p'],['Nama Atlet','a'],['Kategori','s',KT],['Medali','s',['','Emas','Perak','Perunggu']],['Atelet Porprov 2022','s',OY],['Prestasi Porprov 2022','s',OY],[MK]]
 };
 const CFG={
- Cabor:{k:'ID',dk:'cabor',t:'Master Cabang Olahraga',d:'Daftar cabang olahraga beserta ketua dan pendamping — dipakai sebagai pilihan pada menu lainnya',add:'Cabor',cols:['Nama Cabor','Kategori','Ketua Cabor','Pendamping'],sk:['Nama Cabor'],sort:1},
+ Cabor:{k:'ID',dk:'cabor',t:'Master Cabang Olahraga',d:'Daftar cabang olahraga beserta ketua — dipakai sebagai pilihan pada menu lainnya',add:'Cabor',cols:['Nama Cabor','Kategori','Ketua Cabor'],sk:['Nama Cabor'],sort:1},
  KategoriCabor:{k:'ID',dk:'kategoricabor',t:'Kategori Cabor',d:'Kategori cabang olahraga (mis. Akurasi, Bela Diri, Permainan, Terukur). Tambahkan kategori baru di sini; kategori yang masih dipakai cabor tidak bisa dihapus',add:'Kategori',cols:['Nama Kategori'],sk:['Nama Kategori'],sort:1},
  Pertandingan:{k:'ID',dk:'pertandingan',t:'Jenis Pertandingan',d:'Nomor / jenis pertandingan pada tiap cabang olahraga',add:'Pertandingan',cols:['Cabor','Nama Pertandingan','Kategori'],sort:1},
  DataAtlet:{k:'ID',dk:'dataatlet',t:'Data Atlet',d:'Master data atlet. Foto Profil tampil di website; NIK KTP dan Foto KTP bersifat privat (hanya terlihat di halaman admin ini)',add:'Atlet',cols:['Foto Profil','Nama Atlet','Cabor','Jenis Kelamin','NIK KTP','Foto KTP'],sk:['Nama Atlet','Cabor'],q:['Nama Atlet','Cabor','Jenis Kelamin','NIK KTP'],sort:1},
