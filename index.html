@@ -181,7 +181,7 @@ const run=api;
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
 const lines=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
 const MK='Porprov 2025 (Medali)';
-let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',aq='',pc='',pm='',pq='',ck='',bq='',kc='';
+let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',ak='',aq='',pc='',pm='',pq='',ck='',bq='',kc='';
 const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
 function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.kategoricabor=S.kategoricabor||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
@@ -287,9 +287,10 @@ function cDetail(){return ct==='pert'?pertView():athGrid(S.ath.filter(a=>a.c===c
 function pertView(){const f=pertOf(cs).filter(p=>!ck||p.k===ck);
   return f.length?`<p class="sub">${f.length} jenis pertandingan</p><div class="tw"><table><tr><th>Pertandingan</th><th>Kategori</th><th>Medali Porprov 2025</th></tr>${f.map(p=>`<tr><td>${esc(p.n)}</td><td>${esc(p.k)}</td><td>${mbadge(mcount(p.r))}</td></tr>`).join('')}</table></div>`:'<p class="sub">Belum ada data jenis pertandingan.</p>'}
 /* ---- Atlet ---- */
-function atlet(){const cl=caborList().map(c=>c.n);
-  return hd('Profil <span>Atlet</span>','Profil atlet KONI Hulu Sungai Utara','🏃 Atlet')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari nama atlet…" value="${esc(aq)}" oninput="aq=this.value;lim=100;upd()"><select onchange="ac=this.value;lim=100;upd()"><option value="">Semua Cabang Olahraga</option>${opt(cl,ac)}</select></div><div id="cl">${atBody()}</div></div>`}
-function atBody(){const q=aq.toLowerCase();return athGrid(S.ath.filter(a=>(!ac||a.c===ac)&&(!q||a.n.toLowerCase().includes(q))))}
+const katOf=n=>String(kpOf(n).Kategori||'').trim();
+function atlet(){const cl=caborList().map(c=>c.n).filter(n=>!ak||katOf(n)===ak);
+  return hd('Profil <span>Atlet</span>','Profil atlet KONI Hulu Sungai Utara','🏃 Atlet')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari nama atlet…" value="${esc(aq)}" oninput="aq=this.value;lim=100;upd()"><select onchange="ak=this.value;ac='';lim=100;render()"><option value="">Semua Kategori Cabor</option>${opt(katList(),ak)}</select><select onchange="ac=this.value;lim=100;upd()"><option value="">Semua Cabang Olahraga</option>${opt(cl,ac)}</select></div><div id="cl">${atBody()}</div></div>`}
+function atBody(){const q=aq.toLowerCase();return athGrid(S.ath.filter(a=>(!ac||a.c===ac)&&(!ak||katOf(a.c)===ak)&&(!q||a.n.toLowerCase().includes(q))))}
 function athGrid(f){return f.length?`<p class="sub">${f.length} atlet</p><div class="grid g3">${f.slice(0,lim).map(a=>`<div class="card h ath" onclick="readAth(${S.ath.indexOf(a)})">${av(a)}<div><b>${esc(a.n)}</b><small>${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</small>${mbadge(mcount(a.p))}</div></div>`).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:'<p class="sub">Atlet tidak ditemukan.</p>'}
 function readAth(i){const a=S.ath[i];
   openM(`<div class="fx" style="justify-content:flex-start;gap:16px;margin-bottom:16px">${av(a,1)}<div><h2 style="margin:0">${esc(a.n)}</h2><p style="color:var(--m)">${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</p></div></div>${mbadge(mcount(a.p))}<h3 style="margin:18px 0 6px">Prestasi Porprov 2025</h3>${a.p.length?a.p.map(r=>`<div class="pr"><div><b>${esc(r.Pertandingan)}</b><small>${esc(r.Kategori)}</small></div><span class="bd ${esc(r.Medali)}">${esc(r.Medali||'-')}</span></div>`).join(''):'<p class="sub">Belum ada data prestasi.</p>'}<br><button class="btn g" onclick="closeM()">Tutup</button>`)}
