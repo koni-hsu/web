@@ -1,1084 +1,344 @@
-/** WEBSITE KONI HULU SUNGAI UTARA - Backend (Container-bound Apps Script)
- *  Jalankan setup() sekali, lalu Deploy > Web app. */
-const SHEETS = {
-  Berita: ['ID', 'Judul', 'Ringkasan', 'Isi', 'Gambar', 'Tanggal', 'Status', 'Link Video', 'Kategori'],
-  Atlet: ['No', 'Cabor', 'Pertandingan', 'Nama Atlet', 'Kategori', 'Medali', 'Atelet Porprov 2022', 'Prestasi Porprov 2022', 'Porprov 2025 (Medali)'],
-  Profil: ['Kunci', 'Nilai'],
-  Cabor: ['ID', 'Nama Cabor', 'Ketua Cabor', 'Kategori'],
-  KategoriCabor: ['ID', 'Nama Kategori'],
-  Pertandingan: ['ID', 'Cabor', 'Nama Pertandingan', 'Kategori'],
-  DataAtlet: ['ID', 'Nama Atlet', 'Cabor', 'Jenis Kelamin', 'Tanggal Lahir', 'Alamat', 'Foto Profil']
-};
-const DEF_KATEGORI = ['Akurasi', 'Bela Diri', 'Permainan', 'Terukur']; // kategori cabor bawaan; admin dapat menambah/mengubah/menghapus
-/** Isi kategori bawaan ke sheet KategoriCabor (hanya jika masih kosong). */
-function seedKat_(sh) { if (sh && sh.getLastRow() < 2) sh.getRange(2, 1, DEF_KATEGORI.length, 2).setValues(DEF_KATEGORI.map((n, i) => ['kat' + (i + 1), n])); }
-// Catatan: sheet 'Atlet' (atau 'DataBase') = data PRESTASI atlet pada Porprov 2025.
-const DEF_PROFIL = {
-  visi: 'Terwujudnya prestasi olahraga yang membanggakan dan berdaya saing di Kabupaten Hulu Sungai Utara.',
-  misi: 'Meningkatkan pembinaan atlet secara berjenjang\nMemperkuat organisasi cabang olahraga\nMengembangkan sarana dan prasarana olahraga\nMeningkatkan prestasi di tingkat provinsi dan nasional',
-  sejarah: 'Komite Olahraga Nasional Indonesia (KONI) Kabupaten Hulu Sungai Utara adalah induk organisasi cabang olahraga di Kabupaten Hulu Sungai Utara. (Ubah teks ini melalui halaman Admin.)',
-  struktur: 'Ketua | Nama Ketua\nWakil Ketua | Nama Wakil Ketua\nSekretaris | Nama Sekretaris\nBendahara | Nama Bendahara\nBidang Pembinaan Prestasi | Nama Koordinator',
-  alamat: 'Amuntai, Kabupaten Hulu Sungai Utara',
-  telepon: '-',
-  email: '-'
-};
-
-/** API JSON untuk website statis (GitHub Pages).
- *  GET  <URL>/exec?action=getData  -> data publik
- *  POST <URL>/exec  body: {"fn":"login","args":[...]}  -> fungsi admin */
-function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function err_(e) { return json_({ ok: false, error: String((e && e.message) || e) }); }
-
-function doGet(e) {
-  try {
-    const a = e && e.parameter && e.parameter.action;
-    if (a === 'getData') return json_({ ok: true, data: getData() });
-    if (a === 'igMedia') return json_({ ok: true, data: igMedia() });
-    if (a === 'igDebug') return ContentService.createTextOutput(igDebug_()).setMimeType(ContentService.MimeType.TEXT); // diagnosa sementara
-    if (a === 'ping') { try { adminPayload_(); } catch (z) {} return json_({ ok: true, data: 'pong' }); } // pemanasan server + isi cache admin (tidak dikirim ke klien)
-    return json_({ ok: true, data: 'API KONI Hulu Sungai Utara aktif' });
-  } catch (x) { return err_(x); }
-}
-function doPost(e) {
-  try {
-    const req = JSON.parse(e.postData.contents), fn = req.fn, args = req.args || [];
-    const API = { login, getAdminData, saveRow, saveRows, deleteRow, uploadFoto, igMedia }; // daftar fungsi yang boleh dipanggil
-    if (!Object.prototype.hasOwnProperty.call(API, fn)) throw new Error('Fungsi tidak dikenal');
-    return json_({ ok: true, data: API[fn].apply(null, args) });
-  } catch (x) { return err_(x); }
-}
-
-let ssObj_ = null;
-const ss_ = () => ssObj_ || (ssObj_ = SpreadsheetApp.getActiveSpreadsheet());
-
-/** Ambil sheet. Untuk 'Atlet': jika kosong, otomatis pakai sheet 'DataBase' (nama bawaan file Excel). */
-/** Memo per eksekusi: sheet & spreadsheet tidak dicari ulang berkali-kali (tiap panggilan SpreadsheetApp ~100-300 ms). */
-const memoSS_ = {};
-function sheet_(name) { return memoSS_[name] || (memoSS_[name] = sheetRaw_(name)); }
-function sheetRaw_(name) {
-  const sh = ss_().getSheetByName(name);
-  if (name === 'Atlet' && (!sh || sh.getLastRow() < 2)) {
-    const alt = ss_().getSheetByName('DataBase');
-    if (alt && alt.getLastRow() > 1) return alt;
-  }
-  if (!sh && SHEETS[name]) { const n = ss_().insertSheet(name); n.appendRow(SHEETS[name]); if (name === 'KategoriCabor') seedKat_(n); return n; }
-  // Migrasi otomatis: kolom 'Pendamping' sudah dihapus dari sheet Cabor -> hapus kolomnya jika sheet lama masih punya
-  if (sh && name === 'Cabor' && sh.getLastColumn() > 0) {
-    const hd = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim()), pi = hd.indexOf('Pendamping');
-    if (pi > -1) { sh.deleteColumn(pi + 1); try { clearDataCache_(); } catch (e) {} }
-  }
-  // Migrasi otomatis: kolom 'NIK KTP' & 'Foto KTP' sudah dihapus dari sheet DataAtlet -> hapus kolomnya jika sheet lama masih punya
-  if (sh && name === 'DataAtlet' && sh.getLastColumn() > 0) {
-    const hd = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim());
-    const del = ['NIK KTP', 'Foto KTP'].map(k => hd.indexOf(k)).filter(i => i > -1).sort((a, b) => b - a);
-    if (del.length) { del.forEach(i => sh.deleteColumn(i + 1)); try { clearDataCache_(); } catch (e) {} }
-  }
-  // Migrasi otomatis: tambah judul kolom baru jika sheet lama belum punya
-  if (sh && SHEETS[name] && sh.getLastColumn() < SHEETS[name].length) {
-    sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
-  }
-  return sh;
-}
-
-/** Jalankan SEKALI dari editor. Membuat sheet yang belum ada & password admin awal. */
-function setup() {
-  Object.keys(SHEETS).forEach(n => {
-    if (n === 'Atlet') { const s = sheet_('Atlet'); if (s && s.getLastRow() > 1) return; }
-    let sh = ss_().getSheetByName(n) || ss_().insertSheet(n);
-    if (sh.getLastRow() === 0) sh.appendRow(SHEETS[n]);
-    sh.getRange(1, 1, 1, SHEETS[n].length).setFontWeight('bold').setBackground('#c8102e').setFontColor('#fff');
-    sh.setFrozenRows(1);
-  });
-  const p = ss_().getSheetByName('Profil');
-  if (p.getLastRow() < 2) Object.keys(DEF_PROFIL).forEach(k => p.appendRow([k, DEF_PROFIL[k]]));
-  if (ss_().getSheetByName('Berita').getLastRow() < 2) tambahBeritaPorprov2025();
-  seedKat_(sheet_('KategoriCabor'));
-  isiMasterDariPrestasi();
-  const props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('ADMIN_PASSWORD')) props.setProperty('ADMIN_PASSWORD', 'koni-hsu-2026');
-  Logger.log('Setup selesai. Password admin awal: koni-hsu-2026 (ganti di Project Settings > Script Properties)');
-}
-
-/** Mengisi master Cabor, Jenis Pertandingan & Data Atlet dari data prestasi yang sudah ada (hanya jika masih kosong). */
-function isiMasterDariPrestasi() {
-  const pr = rows_('Atlet'), id = () => Utilities.getUuid().slice(0, 8);
-  const has = s => { const sh = ss_().getSheetByName(s); return sh && sh.getLastRow() > 1; };
-  const put = (name, arr) => { if (arr.length) { const sh = sheet_(name); sh.getRange(sh.getLastRow() + 1, 1, arr.length, arr[0].length).setValues(arr); } };
-  if (!has('Cabor')) put('Cabor', [...new Set(pr.map(r => r.Cabor).filter(Boolean))].sort().map(c => [id(), c, '', '']));
-  if (!has('Pertandingan')) { const m = {}; pr.forEach(r => { if (r.Cabor && r.Pertandingan) m[r.Cabor + '|' + r.Pertandingan] = m[r.Cabor + '|' + r.Pertandingan] || [id(), r.Cabor, r.Pertandingan, r.Kategori || '']; }); put('Pertandingan', Object.values(m)); }
-  if (!has('DataAtlet')) { const m = {}; pr.forEach(r => { const n = r['Nama Atlet']; if (n && !m[n + '|' + r.Cabor]) m[n + '|' + r.Cabor] = [id(), n, r.Cabor, '', '', '']; }); put('DataAtlet', Object.values(m)); }
-}
-
-/** Menambahkan berita "Prestasi Porprov 2025" ke sheet Berita (aman dijalankan berulang). */
-function tambahBeritaPorprov2025() {
-  const sh = ss_().getSheetByName('Berita') || ss_().insertSheet('Berita');
-  if (sh.getLastRow() === 0) sh.appendRow(SHEETS.Berita);
-  if (rows_('Berita').some(b => b.ID === 'porprov2025')) return 'Berita sudah ada';
-  const isi = [
-    'Kontingen Kabupaten Hulu Sungai Utara mencatat capaian prestasi pada ajang Pekan Olahraga Provinsi (Porprov) 2025.',
-    'Prestasi diraih atlet dari 38 cabang olahraga dengan total 489 atlet peraih medali: 104 medali emas, 149 medali perak, dan 236 medali perunggu (dihitung per atlet).',
-    'Data lengkap cabang olahraga beserta nama atlet dan nomor pertandingan dapat dilihat pada menu Cabang Olahraga.',
-    'KONI Hulu Sungai Utara mengapresiasi seluruh atlet, pelatih, pengurus cabang olahraga, dan semua pihak yang mendukung capaian ini.'
-  ].join('\n');
-  sh.appendRow(['porprov2025', 'Prestasi Kontingen Hulu Sungai Utara pada Porprov 2025',
-    'Atlet dari 38 cabang olahraga meraih 104 medali emas, 149 perak, dan 236 perunggu pada Porprov 2025.',
-    isi, '', '2026-09-29', 'Terbit']);
-  return 'Berita ditambahkan';
-}
-
-function rows_(name) {
-  const sh = sheet_(name);
-  if (!sh || sh.getLastRow() < 2) return [];
-  const v = sh.getDataRange().getValues(), h = v.shift();
-  return v.filter(r => r[0] !== '').map(r => {
-    const o = {};
-    h.forEach((k, i) => { let x = r[i]; if (x instanceof Date) x = Utilities.formatDate(x, 'Asia/Makassar', 'yyyy-MM-dd'); o[k] = x; });
-    return o;
-  });
-}
-const profil_ = () => { const o = {}; rows_('Profil').forEach(r => o[r.Kunci] = r.Nilai); return o; };
-const byDate_ = (a, b) => String(b.Tanggal).localeCompare(String(a.Tanggal));
-
-/** Cache server (10 menit) bertingkat-potongan, dipakai untuk data publik ('data') dan data admin ('adm'). */
-const CACHE_TTL_ = 3600, CACHE_CHUNK_ = 30000;
-function cacheGet_(pre) {
-  try {
-    const cache = CacheService.getScriptCache(), n = Number(cache.get(pre + '_n') || 0);
-    if (n > 0) {
-      const keys = []; for (let i = 0; i < n; i++) keys.push(pre + '_' + i);
-      const got = cache.getAll(keys), parts = keys.map(k => got[k]);
-      if (parts.every(p => p != null)) return JSON.parse(parts.join(''));
-    }
-  } catch (e) {}
-  return null;
-}
-function cachePut_(pre, data) {
-  try {
-    const json = JSON.stringify(data), put = {}; let n = 0;
-    for (let i = 0; i < json.length; i += CACHE_CHUNK_) put[pre + '_' + n++] = json.substr(i, CACHE_CHUNK_);
-    put[pre + '_n'] = String(n);
-    CacheService.getScriptCache().putAll(put, CACHE_TTL_);
-    return true;
-  } catch (e) { return false; }
-}
-function getData() {
-  const c = cacheGet_('data'); if (c && c.kategoricabor) return c; // cache versi lama (tanpa kategori) diabaikan
-  const data = getDataFresh_(); cachePut_('data', data); return data;
-}
-/** Hapus cache data publik & admin. Dipanggil otomatis saat admin menyimpan/menghapus; jalankan manual jika mengedit langsung di Spreadsheet. */
-function clearDataCache_() {
-  try {
-    const cache = CacheService.getScriptCache(), keys = [];
-    ['data', 'adm'].forEach(pre => { const n = Number(cache.get(pre + '_n') || 0); keys.push(pre + '_n'); for (let i = 0; i < n; i++) keys.push(pre + '_' + i); });
-    cache.removeAll(keys);
-  } catch (e) {}
-}
-function getDataFresh_() {
-  return {
-    berita: rows_('Berita').filter(b => b.Status === 'Terbit').sort(byDate_),
-    atlet: rows_('Atlet'), profil: profil_(),
-    cabor: rows_('Cabor'), kategoricabor: rows_('KategoriCabor'), pertandingan: rows_('Pertandingan'),
-    // Data pribadi (alamat, tanggal lahir) sengaja TIDAK dikirim ke halaman publik
-    dataatlet: rows_('DataAtlet').map(pubAtlet_)
-  };
-}
-const pubAtlet_ = a => ({ 'Nama Atlet': a['Nama Atlet'], Cabor: a.Cabor, 'Jenis Kelamin': a['Jenis Kelamin'], 'Foto Profil': a['Foto Profil'] });
-
-/** Setelah simpan/hapus: perbarui HANYA sheet yang berubah di dalam cache (data publik & admin),
- *  tidak menghapus seluruh cache. Jadi load data berikutnya tetap cepat (tidak baca ulang semua sheet). */
-const CACHE_KEY_ = { Berita: 'berita', Atlet: 'atlet', Profil: 'profil', Cabor: 'cabor', KategoriCabor: 'kategoricabor', Pertandingan: 'pertandingan', DataAtlet: 'dataatlet' };
-function patchCache_(name) {
-  const k = CACHE_KEY_[name];
-  try {
-    if (!k) return clearDataCache_();
-    const rows = name === 'Profil' ? profil_() : rows_(name);
-    let ok = true;
-    const adm = cacheGet_('adm');
-    if (adm) { adm[k] = name === 'Berita' ? rows.slice().sort(byDate_) : rows; ok = cachePut_('adm', adm) && ok; }
-    const pub = cacheGet_('data');
-    if (pub) {
-      pub[k] = name === 'Berita' ? rows.filter(b => b.Status === 'Terbit').sort(byDate_) : name === 'DataAtlet' ? rows.map(pubAtlet_) : rows;
-      ok = cachePut_('data', pub) && ok;
-    }
-    if (!ok) clearDataCache_(); // gagal menulis cache -> hapus agar tidak ada data basi
-  } catch (e) { clearDataCache_(); }
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet"></noscript>
+<style>
+:root{--r:#c8102e;--g:#f5b800;--n:#0b1330;--bg:#f4f6fb;--c:#fff;--t:#1b2240;--m:#6b7390;--b:#e4e8f2}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
+a{color:inherit}button{font:inherit;cursor:pointer}
+.w{max-width:1150px;margin:auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:50;background:var(--n);color:#fff}
+nav .w{display:flex;align-items:center;justify-content:space-between;height:66px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;cursor:pointer}
+.logo i{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--r),var(--g));display:grid;place-items:center;font-style:normal}
+.logo i.lg{background:#fff;padding:3px;width:44px;height:44px;overflow:hidden;flex:none}.logo i.lg img{height:38px;width:auto;max-width:100%;object-fit:contain;display:block}
+.logo small{display:block;font-weight:700;font-size:11px;opacity:.85;line-height:1}
+.menu{display:flex;gap:6px}
+.menu a{padding:8px 16px;border-radius:99px;text-decoration:none;font-size:14px;font-weight:600;cursor:pointer;opacity:.8;transition:.2s}
+.menu a:hover,.menu a.on{background:rgba(255,255,255,.14);opacity:1}
+.menu a.adm{background:var(--g);color:var(--n);opacity:1}
+.burger{display:none;background:none;border:0;color:#fff;font-size:26px}
+.hero{background:radial-gradient(circle at 20% 20%,#7a0a1e,transparent 45%),radial-gradient(circle at 85% 70%,#1d3a8a,transparent 45%),var(--n);color:#fff;padding:54px 0 70px;position:relative;overflow:hidden}
+.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;filter:blur(70px);animation:fl 9s ease-in-out infinite}
+.hero:before{width:320px;height:320px;background:var(--r);opacity:.35;top:-80px;right:10%}
+.hero:after{width:260px;height:260px;background:var(--g);opacity:.25;bottom:-60px;left:8%;animation-delay:-4s}
+@keyframes fl{50%{transform:translate(40px,30px) scale(1.15)}}
+.hero .w{position:relative;z-index:1}
+.hl{position:absolute;right:20px;top:50%;transform:translateY(-50%);background:#fff;border-radius:32px;padding:22px 26px;box-shadow:0 30px 70px rgba(0,0,0,.45);animation:fl2 6s ease-in-out infinite}.hl img{width:220px;display:block}
+@keyframes fl2{50%{transform:translateY(-54%)}}
+.fl{display:flex;gap:14px;align-items:center}.fl i{background:#fff;border-radius:14px;padding:4px;display:block}.fl img{height:54px;display:block}
+.tag{display:inline-block;padding:5px 13px;border-radius:99px;background:rgba(255,255,255,.12);font-size:12px;font-weight:600;margin-bottom:10px}
+.hero h1{font-size:clamp(28px,4.7vw,48px);font-weight:800;line-height:1.08;max-width:680px}
+.hero h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;color:transparent}
+.hero p{max-width:520px;margin:10px 0 0;opacity:.8}
+.btn{display:inline-block;border:0;padding:12px 24px;border-radius:99px;font-weight:700;background:var(--r);color:#fff;text-decoration:none;transition:.2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(200,16,46,.35)}
+.btn.o{background:rgba(255,255,255,.12);margin-left:8px}.btn.s{padding:7px 14px;font-size:13px}.btn.g{background:var(--bg);color:var(--t)}.btn.d{background:#fee;color:var(--r)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:-42px;position:relative;z-index:2;padding:0 10px}
+.st{background:var(--c);border-radius:50%;width:150px;height:150px;padding:18px;box-shadow:0 12px 36px rgba(11,19,48,.09);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:auto;animation:statIn .7s ease both;transition:transform .3s,box-shadow .3s}
+.st:hover{transform:translateY(-7px) scale(1.04);box-shadow:0 18px 42px rgba(11,19,48,.15)}
+.st i{font-style:normal;font-size:28px;line-height:1;margin-bottom:6px;animation:statIcon 2.4s ease-in-out infinite}
+.st b{display:block;font-size:34px;font-weight:800;line-height:1.05}.st span{color:var(--m);font-size:13px}
+@keyframes statIn{from{opacity:0;transform:scale(.7) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes statIcon{50%{transform:translateY(-3px) rotate(3deg)}}
+.cap{text-align:center;color:var(--m);font-size:14px;margin:18px 0 52px}
+.av{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--r),var(--n));color:#fff;display:grid;place-items:center;font-weight:800;flex:none}.av.big{width:112px;height:112px;font-size:36px;border-radius:26px}
+.ath{display:flex;gap:18px;align-items:center;padding:22px}.ath small{display:block;color:var(--m);margin-bottom:8px}.ath b{display:block;font-size:18px;line-height:1.3;margin-bottom:2px}.ath>div:last-child{min-width:0}
+.ath .av{width:104px;height:104px;border-radius:24px;font-size:34px}
+.grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:980px){.grid.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.grid.g3{grid-template-columns:1fr}.ath{padding:18px;gap:16px}.ath .av{width:88px;height:88px;font-size:28px;border-radius:20px}}
+.pr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--b)}.pr small{display:block;color:var(--m)}
+.sec{display:flex;align-items:center;gap:10px;margin:26px 0 14px;font-size:20px;flex-wrap:wrap}.sec:first-child{margin-top:4px}
+section{padding:56px 0}
+h2{font-size:24px;font-weight:800;line-height:1.25;margin-bottom:4px}.sub{color:var(--m);font-size:14px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:22px}
+.card{background:var(--c);border-radius:20px;overflow:hidden;box-shadow:0 4px 18px rgba(11,19,48,.06);transition:.3s;border:1px solid var(--b)}
+.card.h{cursor:pointer}.card.h:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(11,19,48,.14)}
+.img{height:170px;background:linear-gradient(135deg,var(--r),var(--n)) center/cover;display:grid;place-items:center;font-size:44px}
+.pd{padding:20px}.pd small{color:var(--r);font-weight:700;font-size:12px}.pd h3{font-size:17px;margin:4px 0 6px;line-height:1.3}.pd p{color:var(--m);font-size:14px}
+.rv{opacity:0;transform:translateY(24px);transition:.6s}.rv.in{opacity:1;transform:none}
+.w.pg{padding:30px 20px 60px;min-height:70vh}
+.ph{background:radial-gradient(circle at 20% 20%,#7a0a1e,transparent 45%),radial-gradient(circle at 85% 70%,#1d3a8a,transparent 45%),var(--n);color:#fff;padding:26px 0 30px;position:relative;overflow:hidden}
+.ph:before,.ph:after{content:"";position:absolute;border-radius:50%;filter:blur(60px);animation:fl 9s ease-in-out infinite}
+.ph:before{width:240px;height:240px;background:var(--r);opacity:.32;top:-100px;right:10%}
+.ph:after{width:200px;height:200px;background:var(--g);opacity:.22;bottom:-90px;left:8%;animation-delay:-4s}
+.ph .w{position:relative;z-index:1}.ph .tag{margin-bottom:8px}
+.ph h1{font-size:clamp(22px,3.4vw,30px);font-weight:800;line-height:1.15}
+.ph h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ph p{opacity:.8;font-size:14px;margin-top:5px;max-width:600px}
+/* ---- Profil ---- */
+.pfw{background:radial-gradient(circle at 8% 12%,rgba(200,16,46,.09),transparent 38%),radial-gradient(circle at 94% 40%,rgba(29,58,138,.10),transparent 42%),radial-gradient(circle at 15% 88%,rgba(245,184,0,.12),transparent 36%),linear-gradient(180deg,#eef1f9 0%,#f7f8fc 50%,#eef1f9 100%);position:relative}
+.pfw:before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(11,19,48,.07) 1px,transparent 1px);background-size:22px 22px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%);pointer-events:none}
+.pf{position:relative}
+.pf .box{position:relative;overflow:hidden;border:1px solid rgba(11,19,48,.07);box-shadow:0 10px 30px -12px rgba(11,19,48,.18);padding:30px 32px 30px 36px}
+.pf .box:before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:linear-gradient(180deg,var(--r),var(--g))}
+.pf .box h3{font-size:20px;color:var(--n);padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--b)}
+.pf .box p{color:#3a4262}
+.pf .box.vs{background:radial-gradient(circle at 85% 20%,rgba(245,184,0,.22),transparent 45%),linear-gradient(135deg,#7a0a1e 0%,#0b1330 60%,#1d3a8a 100%);color:#fff;border:0}
+.pf .box.vs:before{background:var(--g)}
+.pf .box.vs h3{color:var(--g);border-bottom-color:rgba(255,255,255,.18)}
+.pf .box.vs p{color:#fff;font-size:18px;font-weight:600;line-height:1.7}
+.pf .box ol{list-style:none;padding:0;counter-reset:m}
+.pf .box ol li{counter-increment:m;position:relative;padding:12px 14px 12px 56px;margin:10px 0;background:var(--bg);border-radius:14px;min-height:48px}
+.pf .box ol li:before{content:counter(m);position:absolute;left:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--r),#8f0a20);color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center}
+.pf .box p+p{margin-top:10px}
+.pf .org{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+.pf .org div{position:relative;overflow:hidden;text-align:center;background:#fff;border:1px solid var(--b);border-top:1px solid var(--b);border-radius:20px;padding:84px 18px 24px;box-shadow:0 10px 26px -14px rgba(11,19,48,.3);transition:.3s}
+.pf .org div:before{content:"";position:absolute;left:0;right:0;top:0;height:64px;background:linear-gradient(135deg,var(--n),#1d3a8a 60%,var(--r))}
+.pf .org div:hover{transform:translateY(-6px);box-shadow:0 20px 34px -14px rgba(11,19,48,.4);border-color:var(--g)}
+.pf .org .oa{position:absolute;left:50%;top:36px;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--g),#ffdc6b);color:var(--n);font-weight:800;font-size:19px;display:grid;place-items:center;border:3px solid #fff;box-shadow:0 6px 14px -4px rgba(11,19,48,.4);z-index:1}
+.pf .org small{display:inline-block;background:rgba(200,16,46,.09);color:var(--r);padding:3px 12px;border-radius:99px;text-transform:uppercase;letter-spacing:.7px;font-size:11px;font-weight:800;margin-top:0}
+.pf .org b{color:var(--n);font-size:17px;margin-top:8px;line-height:1.3}
+.pf .org div.top{background:linear-gradient(160deg,#0b1330,#1d3a8a);border-color:transparent}
+.pf .org div.top:before{background:linear-gradient(135deg,var(--r),#7a0a1e)}
+.pf .org div.top small{background:rgba(245,184,0,.18);color:var(--g)}
+.pf .org div.top b{color:#fff}
+@media(max-width:760px){.pf .box{padding:22px 20px 22px 26px}.pf .box.vs p{font-size:16px}}
+.box{background:var(--c);border-radius:20px;padding:28px;border:1px solid var(--b);margin-bottom:22px}
+.box h3{margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.box ol{padding-left:20px}.box li{margin:6px 0}
+.org{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.org div{background:var(--bg);border-radius:16px;padding:18px;border-top:4px solid var(--r)}.org small{color:var(--m)}.org b{display:block}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+input,select,textarea{font:inherit;padding:11px 16px;border:1px solid var(--b);border-radius:14px;background:#fff;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--r);box-shadow:0 0 0 3px rgba(200,16,46,.12)}
+.bar input{flex:2;min-width:200px}.bar select{flex:1;min-width:160px}
+.cb{padding:22px;cursor:pointer}.cb h3{font-size:16px;margin-bottom:10px}
+.kp{display:flex;gap:28px;flex-wrap:wrap}.kp div{min-width:0}.kp small{display:block;color:var(--m);font-size:12px}.kp b{display:block;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.cb .kp{margin-top:14px;padding-top:12px;border-top:1px solid var(--b);gap:18px}.kp.big{gap:36px}.kp.big small{font-size:13px}.kp.big b{font-size:17px}
+.md{display:flex;gap:6px;flex-wrap:wrap}
+.bd{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:var(--bg)}
+.Emas{background:#fff3c4;color:#8a6500}.Perak{background:#e9edf3;color:#4a5568}.Perunggu{background:#fde5d3;color:#9c4a1a}
+.tw{overflow-x:auto;background:var(--c);border-radius:20px;border:1px solid var(--b)}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th{background:var(--bg);text-align:left;padding:12px 14px;font-size:12px;text-transform:uppercase;color:var(--m)}
+td{padding:11px 14px;border-top:1px solid var(--b)}
+.mo{position:fixed;inset:0;background:rgba(11,19,48,.6);backdrop-filter:blur(4px);z-index:100;display:none;place-items:center;padding:16px}
+.mo.on{display:grid}
+.mb{background:#fff;border-radius:24px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:28px;animation:pop .25s}
+@keyframes pop{from{transform:scale(.94);opacity:0}}
+.fg{margin-bottom:14px}.fg label{display:block;font-size:13px;font-weight:700;margin-bottom:4px}
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.tabs button{border:0;padding:10px 20px;border-radius:99px;background:#fff;font-weight:700;border:1px solid var(--b)}
+.tabs button.on{background:var(--r);color:#fff;border-color:var(--r)}
+.fx{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+footer{background:var(--n);color:#fff;padding:22px 0;border-top:1px solid #ffffff1a;font-size:13px;line-height:1.4}footer .w{display:flex;justify-content:space-between;align-items:center;gap:14px 20px;flex-wrap:wrap}footer p{opacity:.7;font-size:12.5px}footer .fl{gap:12px;min-width:0;flex:1 1 320px}footer .fl b{font-size:16px;font-weight:800;line-height:1.3;display:block}footer .fl small{display:block;font-weight:700;font-size:11px;opacity:.85;line-height:1;margin:3px 0 10px}footer .fl p{max-width:640px}footer .w>p{white-space:nowrap;flex:none}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--n);color:#fff;padding:12px 22px;border-radius:99px;z-index:200;display:none}
+.ld{text-align:center;padding:80px;color:var(--m)}
+.dd{position:relative}.dd>a{display:block}
+.dm{display:none;position:absolute;top:100%;left:0;min-width:220px;background:var(--n);border-radius:16px;padding:8px;box-shadow:0 18px 40px rgba(0,0,0,.35);flex-direction:column;gap:2px;z-index:60}
+.dd:hover .dm,.dd.open .dm{display:flex}
+@media(max-width:760px){.dm{position:static;box-shadow:none;background:rgba(255,255,255,.06);margin:4px 0 4px 12px}.dd:hover .dm{display:none}.dd.open .dm{display:flex}}
+@media(max-width:1000px){.hl{display:none}}
+@media(max-width:760px){.burger{display:block}.menu{display:none;position:absolute;top:66px;left:0;right:0;background:var(--n);flex-direction:column;padding:12px}.menu.on{display:flex}.hero{padding:42px 0 62px}.hero h1{font-size:clamp(27px,7.8vw,38px)}.hero p{margin:8px 0 16px}.btn.o{margin:7px 0 0}}
+@media(max-width:760px){.w{padding:0 16px}nav .w{height:66px}.menu{display:flex!important;position:fixed!important;top:0;bottom:0;left:0;right:auto;width:min(84vw,330px);height:100dvh;padding:88px 18px 24px!important;background:#0b1330!important;flex-direction:column!important;align-items:stretch;gap:8px;z-index:120;transform:translateX(-105%);transition:transform .28s ease;box-shadow:18px 0 50px #06102b55;overflow-y:auto}.menu.on{transform:translateX(0)}.menu a{display:flex;align-items:center;min-height:48px;padding:12px 15px;border-radius:13px}.burger{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#ffffff16;z-index:130}body.nav-open:after{content:"";position:fixed;inset:0;background:#07102799;backdrop-filter:blur(2px);z-index:110}.dd .dm{position:static;width:100%;min-width:0;margin:4px 0 4px 8px;padding:6px;background:#ffffff0c}.hero{padding:42px 0 62px}.hero h1{font-size:clamp(27px,7.8vw,38px)}.hero p{margin:8px 0 16px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:-30px;padding:0}.st{width:125px;height:125px;padding:14px}.st i{font-size:23px}.st b{font-size:27px}section{padding:38px 0}h2{font-size:24px}.grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:14px}.box{padding:18px}.bar{display:grid;grid-template-columns:1fr}.bar input,.bar select{min-width:0}.tw{border-radius:14px}.mb{padding:20px}footer .w{align-items:flex-start}}@media(max-width:760px){.w.pg{padding:22px 16px 48px}.ph{padding:22px 0 24px}.ph p{font-size:13px}h2{font-size:21px}.sec{font-size:18px}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+/* === FIX MOBILE: tombol menu kiri atas + teks menu jelas === */
+@media(max-width:760px){
+nav{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#0b1330!important;z-index:200!important}
+nav .w{justify-content:flex-start!important;gap:12px}
+.burger{order:-1;flex:none;font-size:24px;line-height:1;color:#fff;border:1px solid #ffffff30;cursor:pointer}
+.logo{order:0;min-width:0}
+body.nav-open:after{z-index:110!important}
+.menu{z-index:120!important;padding-top:84px!important}
+.menu a,.menu .dd>a{color:#fff!important;opacity:1!important;font-size:16px!important;font-weight:600;background:transparent}
+.menu a:hover,.menu a:active{background:rgba(255,255,255,.16)!important}
+.menu a.on{background:rgba(245,184,0,.22)!important;color:#ffd24d!important}
+.menu a.adm{background:var(--g)!important;color:var(--n)!important}
+.dd .dm{background:#16214a!important}
+.dd .dm a{color:#fff!important;font-size:15px!important;font-weight:500}
+.dd .dm a.on{color:#ffd24d!important}
 }
 
-/** ---- ADMIN ---- */
-function login(pw) {
-  const p = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
-  if (!p || pw !== p) throw new Error('Password salah');
-  const t = Utilities.getUuid();
-  CacheService.getScriptCache().put('t_' + t, '1', 21600);
-  return { token: t, data: adminPayload_() }; // token + data admin dalam SATU request (lebih cepat)
-}
-function auth_(t) { if (!t || !CacheService.getScriptCache().get('t_' + t)) throw new Error('Sesi berakhir, silakan login ulang'); }
+/* Tombol kembali: jelas & di kanan */
+.btn.backbtn{background:var(--r);color:#fff;padding:12px 22px;font-size:15px;font-weight:800;box-shadow:0 6px 16px rgba(200,16,46,.35);border:2px solid var(--r)}
+.btn.backbtn:hover{background:#a80d25;border-color:#a80d25}
+@media(max-width:760px){.btn.backbtn{width:100%;text-align:center;font-size:15px}}
 
-function getAdminData(t) { auth_(t); return adminPayload_(); }
-function adminPayload_() {
-  const c = cacheGet_('adm'); if (c && c.kategoricabor) return c;
-  const d = { berita: rows_('Berita').sort(byDate_), atlet: rows_('Atlet'), profil: profil_(),
-    cabor: rows_('Cabor'), kategoricabor: rows_('KategoriCabor'), pertandingan: rows_('Pertandingan'), dataatlet: rows_('DataAtlet') };
-  cachePut_('adm', d); return d;
-}
+/* Skeleton loading */
+.sk{max-width:1150px;margin:auto;padding:0 20px}
+.sk .hb{height:230px;border-radius:0;background:linear-gradient(120deg,#1a2452,#3a1230);margin:0 -20px 24px}
+.sk .ro{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:-50px}
+.sk .ci{aspect-ratio:1;border-radius:50%;max-width:200px;width:100%;margin:auto}
+.sk .ln{height:16px;border-radius:8px;margin:14px 0}
+.sk .ci,.sk .ln{background:linear-gradient(90deg,#e8ecf6 25%,#f6f8fd 50%,#e8ecf6 75%);background-size:200% 100%;animation:shm 1.2s linear infinite}
+@keyframes shm{to{background-position:-200% 0}}
+@media(max-width:760px){.sk .hb{height:200px}.sk .ro{grid-template-columns:repeat(2,1fr);margin-top:-30px}.sk .ci{max-width:125px}}
 
-function validate_(name, obj) {
-  if (!SHEETS[name]) throw new Error('Sheet tidak valid');
-}
-/** Simpan/ubah satu baris. Pemanggil WAJIB memegang lock. Foto lama yang perlu dihapus dimasukkan ke 'trash'. */
-function upsert_(name, obj, trash) {
-  const h = SHEETS[name], sh = sheet_(name), lr = sh.getLastRow();
-  // Hanya baca kolom ID (bukan seluruh sheet) -> jauh lebih cepat
-  const ids = lr > 1 ? sh.getRange(2, 1, lr - 1, 1).getValues() : [];
-  let id = obj[h[0]], row = -1, ren = null;
-  if (id !== '' && id != null) { const i = ids.findIndex(r => String(r[0]) === String(id)); if (i >= 0) row = i + 2; }
-  const isNew = row < 0;
-  if (name === 'KategoriCabor') { // nama wajib & tidak boleh kembar
-    const nm = String(obj['Nama Kategori'] || '').trim(); if (!nm) throw new Error('Nama Kategori wajib diisi');
-    obj['Nama Kategori'] = nm;
-    const nms = lr > 1 ? sh.getRange(2, 2, lr - 1, 1).getValues() : [];
-    if (nms.some((r, i) => i + 2 !== row && String(r[0]).trim().toLowerCase() === nm.toLowerCase())) throw new Error('Kategori sudah ada');
-  }
-  if (isNew) {
-    if (!id) id = name === 'Atlet' ? Math.max(0, ...ids.map(r => Number(r[0]) || 0)) + 1 : Utilities.getUuid().slice(0, 8);
-    obj[h[0]] = id; row = lr + 1;
-    if (row > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 200);
-  } else if (name === 'DataAtlet') {
-    const cur = sh.getRange(row, 1, 1, h.length).getValues()[0];
-    const oldP = cur[h.indexOf('Foto Profil')];
-    if (oldP && oldP !== obj['Foto Profil']) trash.push(['profil', oldP]);
-  } else if (name === 'KategoriCabor') ren = sh.getRange(row, 2).getValue();
-  sh.getRange(row, 1, 1, h.length).setValues([h.map(k => obj[k] == null ? '' : obj[k])]);
-  if (ren && String(ren) !== String(obj['Nama Kategori'])) renameKat_(ren, obj['Nama Kategori']);
-  return id;
-}
-/** Kategori diganti nama -> semua cabor yang memakainya ikut berubah. */
-function renameKat_(from, to) {
-  const sh = sheet_('Cabor'), lr = sh.getLastRow(), c = SHEETS.Cabor.indexOf('Kategori') + 1;
-  if (lr < 2) return;
-  const rg = sh.getRange(2, c, lr - 1, 1), v = rg.getValues(); let ch = false;
-  v.forEach(r => { if (String(r[0]) === String(from)) { r[0] = to; ch = true; } });
-  if (ch) { rg.setValues(v); patchCache_('Cabor'); }
-}
-function trashAll_(trash) { trash.forEach(x => trashProfil_(x[1])); }
+/* Logo tanpa latar putih */
+.logo i.lg{background:none!important;padding:0!important;width:auto!important;height:46px!important;border-radius:0!important;overflow:visible!important;display:flex;align-items:center}
+.logo i.lg img{height:46px!important;width:auto!important;max-width:none!important}
+.fl i{background:none!important;padding:0!important;border-radius:0!important}
+.fl img{height:44px!important;width:auto}
 
-function saveRow(t, name, obj) {
-  auth_(t); validate_(name, obj);
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  const trash = []; let id;
-  try { id = upsert_(name, obj, trash); patchCache_(name); } finally { lock.releaseLock(); }
-  trashAll_(trash); // hapus foto lama (Drive, lambat) setelah kunci dilepas
-  return id;
-}
+/* Logo hero tanpa latar putih */
+.hl{background:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important}
+.hl img{width:170px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.45))}
+.vid iframe{display:block;width:100%;height:560px;border:0;background:#000}.vid.yt iframe{height:auto;aspect-ratio:16/9}.igb{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,#7a0a1e,#1d3a8a);color:#fff;border-radius:18px;padding:16px 20px;margin-bottom:18px}.igb a{color:#fff}.igg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-bottom:22px}.igc{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 6px 22px #0b133014}.igc video{display:block;width:100%;aspect-ratio:9/16;max-height:440px;object-fit:cover;background:#000}.igt{padding:10px 12px 2px;font-size:.85rem;color:#444;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.igc a{display:block;padding:6px 12px 12px;font-size:.8rem;font-weight:700}.igp{max-width:540px;margin:0 auto 22px;border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 8px 28px #0b133014}.igp iframe{display:block;width:100%;height:760px;border:0}@media(max-width:760px){.igp iframe{height:640px}}
+</style>
+</head>
+<body>
+<nav><div class="w">
+  <button class="burger" aria-label="Buka menu" onclick="toggleNav()">☰</button>
+  <div class="logo" onclick="go('home')"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>KONI<small>Kab. Hulu Sungai Utara</small></div></div>
+  <div class="menu">
+    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><a data-p="artikel,berita" onclick="go('artikel')">Artikel</a><a data-p="ig" onclick="go('ig')">Instagram</a>
+    <div class="dd"><a class="dt" data-p="cabor,atlet" onclick="this.parentNode.classList.toggle('open')">Cabor &amp; Atlet ▾</a><div class="dm"><a data-p="cabor" onclick="go('cabor')">🏟️ Cabor</a><a data-p="atlet" onclick="go('atlet')">🏃 Atlet</a></div></div>
+    <div class="dd"><a class="dt" data-p="porprov" onclick="this.parentNode.classList.toggle('open')">Prestasi Atlet ▾</a><div class="dm"><a data-p="porprov" onclick="go('porprov')">🏅 Porprov 2025</a></div></div>
+  </div>
+</div></nav>
+<main id="app"><div class="sk"><div class="hb"></div><div class="ro"><div class="ci"></div><div class="ci"></div><div class="ci"></div><div class="ci"></div></div><div class="ln" style="width:60%"></div><div class="ln" style="width:85%"></div><div class="ln" style="width:70%"></div></div></main>
+<footer><div class="w"><div class="fl"><div><b>KONI</b><small>Kab. Hulu Sungai Utara</small><p id="ft"></p></div></div><p>© KONI HSU</p></div></footer>
+<div class="mo" id="mo" onclick="if(event.target===this)closeM()"><div class="mb" id="mb"></div></div>
+<div id="toast"></div>
 
-/** Simpan BANYAK baris sekaligus dalam satu request (mis. seluruh isian Profil). objs = [{...}, ...] */
-function saveRows(t, name, objs) {
-  auth_(t);
-  if (!SHEETS[name] || !Array.isArray(objs)) throw new Error('Data tidak valid');
-  objs.forEach(o => validate_(name, o));
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  const trash = []; let res;
-  try {
-    if (name === 'Profil') { saveProfil_(objs); res = true; }
-    else res = objs.map(o => upsert_(name, o, trash));
-    patchCache_(name);
-  } finally { lock.releaseLock(); }
-  trashAll_(trash);
-  return res;
-}
-/** Profil: baca sekali, tulis sekali (bukan 1 request per kunci). */
-function saveProfil_(objs) {
-  const sh = sheet_('Profil'), lr = sh.getLastRow();
-  const cur = lr > 1 ? sh.getRange(2, 1, lr - 1, 2).getValues() : [], pos = {}, add = [];
-  cur.forEach((r, i) => { pos[String(r[0])] = i; });
-  objs.forEach(o => {
-    const k = String(o.Kunci || ''); if (!k) return;
-    const v = o.Nilai == null ? '' : o.Nilai;
-    if (Object.prototype.hasOwnProperty.call(pos, k)) cur[pos[k]][1] = v; else { pos[k] = -1; add.push([k, v]); }
-  });
-  if (cur.length) sh.getRange(2, 1, cur.length, 2).setValues(cur);
-  if (add.length) {
-    const start = Math.max(lr, 1) + 1;
-    if (start + add.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), add.length + 20);
-    sh.getRange(start, 1, add.length, 2).setValues(add);
-  }
-}
+<script src="config.js"></script>
+<script src="logo.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+document.querySelectorAll('img[data-logo]').forEach(i=>i.src=LOGO);
+(function(){['icon','apple-touch-icon'].forEach(function(r){var l=document.querySelector('link[rel="'+r+'"]');if(!l){l=document.createElement('link');l.rel=r;document.head.appendChild(l)}l.href=LOGO})})(); // logo KONI sebagai ikon tab browser
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const run=api;
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)};
+const lines=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
+const MK='Porprov 2025 (Medali)';
+let S={berita:[],atlet:[],profil:{}},page='home',cs='',cq='',ct='pert',lim=100,CL=[],ac='',ak='',aq='',pc='',pm='',pq='',ck='',bq='',kc='';
+const TABLE_COLS=['Nama Atlet','Cabor','Pertandingan','Kategori','Medali'];
 
-function trashFile_(id) { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} }
-/** Hapus foto profil lama (URL thumbnail Drive) - hanya jika file memang berada di folder Foto Profil Atlet. */
-function trashProfil_(url) {
-  try {
-    const m = String(url || '').match(/[?&]id=([\w-]+)/), fid = PropertiesService.getScriptProperties().getProperty('FOTO_PROFIL_FOLDER');
-    if (!m || !fid) return;
-    const f = DriveApp.getFileById(m[1]), ps = f.getParents();
-    while (ps.hasNext()) if (ps.next().getId() === fid) { f.setTrashed(true); return; }
-  } catch (e) {}
+function applyData(d){S=d;S.cabor=S.cabor||[];S.pertandingan=S.pertandingan||[];S.dataatlet=S.dataatlet||[];S.kategoricabor=S.kategoricabor||[];S.ath=athletes();render();$('#ft').textContent=String((S.profil&&S.profil.alamat)||'').replace(/\bKabupaten\b/g,'Kab.')}
+const CK='koni_hsu_data_v2';
+function load(bg){
+  let cached=null,raw=null;
+  try{raw=localStorage.getItem(CK);if(raw)cached=JSON.parse(raw)}catch(e){}
+  if(cached&&!bg){try{applyData(cached)}catch(e){cached=null}}
+  run('getData').then(d=>{
+    let j=null;try{j=JSON.stringify(d)}catch(e){}
+    if(j&&j===raw&&cached)return;
+    try{if(j)localStorage.setItem(CK,j)}catch(e){}
+    const busy=document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+    if(!cached||!busy)applyData(d);
+  }).catch(e=>{if(!cached)$('#app').innerHTML='<div class="ld">Gagal memuat: '+esc(e.message)+'</div>'});
 }
-
-function deleteRow(t, name, id) {
-  auth_(t);
-  if (!SHEETS[name] || name === 'Profil') throw new Error('Tidak diizinkan');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  const trash = [];
-  try {
-    const sh = sheet_(name), lr = sh.getLastRow();
-    const ids = lr > 1 ? sh.getRange(2, 1, lr - 1, 1).getValues() : [];
-    const i = ids.findIndex(r => String(r[0]) === String(id));
-    if (i >= 0) {
-      const row = i + 2;
-      if (name === 'KategoriCabor') { const nm = String(sh.getRange(row, 2).getValue()); if (rows_('Cabor').some(c => String(c.Kategori) === nm)) throw new Error('Kategori masih dipakai oleh cabang olahraga. Ubah kategori cabor tersebut dulu.'); }
-      if (name === 'DataAtlet') {
-        const cur = sh.getRange(row, 1, 1, SHEETS.DataAtlet.length).getValues()[0];
-        const p = cur[SHEETS.DataAtlet.indexOf('Foto Profil')];
-        if (p) trash.push(['profil', p]);
-      }
-      sh.deleteRow(row);
-    }
-    patchCache_(name);
-  } finally { lock.releaseLock(); }
-  trash.forEach(x => trashProfil_(x[1]));
-  return true;
+function setBurger(){var b=document.querySelector('.burger');if(b)b.textContent=document.body.classList.contains('nav-open')?'✕':'☰'}
+function toggleNav(){$('.menu').classList.toggle('on');document.body.classList.toggle('nav-open');setBurger()}
+function closeNav(){$('.menu').classList.remove('on');document.body.classList.remove('nav-open');setBurger()}
+document.addEventListener('click',function(e){if(document.body.classList.contains('nav-open')&&!e.target.closest('.menu,.burger'))closeNav()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeNav()});
+function go(p){page=p;lim=100;document.querySelectorAll('.dd').forEach(d=>d.classList.remove('open'));closeNav();render();scrollTo(0,0)}
+function render(){
+  document.querySelectorAll('.menu a').forEach(a=>a.classList.toggle('on',a.dataset.p.split(',').includes(page)));
+  $('#app').innerHTML=({home,profil,berita,artikel:berita,media:berita,ig:igpage,cabor,atlet,porprov})[page]();
+  if(page==='home')count();
+  const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('in')),{threshold:.1});
+  document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 }
-
-/** ---- UPLOAD FOTO (Google Drive) ---- */
-function folderBy_(prop, title, priv) {
-  const props = PropertiesService.getScriptProperties(), id = props.getProperty(prop);
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
-  const f = DriveApp.createFolder(title);
-  if (priv) f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-  props.setProperty(prop, f.getId());
-  return f;
+const medals=()=>{const c={Emas:0,Perak:0,Perunggu:0};S.atlet.forEach(a=>c[a.Medali]!==undefined&&c[a.Medali]++);return c};
+const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const nk=(a,c)=>String(a||'').trim().replace(/\s+/g,' ').toLowerCase()+'|'+String(c||'').trim().toLowerCase();
+function athletes(){const m={};S.dataatlet.forEach(a=>{m[nk(a['Nama Atlet'],a.Cabor)]={n:String(a['Nama Atlet']).trim(),c:a.Cabor,jk:a['Jenis Kelamin'],f:a['Foto Profil']||'',p:[]}});
+  S.atlet.forEach(r=>{const k=nk(r['Nama Atlet'],r.Cabor);(m[k]=m[k]||{n:r['Nama Atlet'],c:r.Cabor,jk:'',p:[]}).p.push(r)});
+  return Object.values(m).sort((a,b)=>String(a.n).localeCompare(String(b.n)))}
+const mcount=rows=>{const c={Emas:0,Perak:0,Perunggu:0};rows.forEach(r=>c[r.Medali]!==undefined&&c[r.Medali]++);return c};
+const mbadge=c=>`<div class="md"><span class="bd Emas">🥇 ${c.Emas}</span><span class="bd Perak">🥈 ${c.Perak}</span><span class="bd Perunggu">🥉 ${c.Perunggu}</span></div>`;
+function pertOf(cab){const m={};S.pertandingan.filter(p=>p.Cabor===cab).forEach(p=>m[p['Nama Pertandingan']]={n:p['Nama Pertandingan'],k:p.Kategori,r:[]});
+  S.atlet.filter(r=>r.Cabor===cab&&r.Pertandingan).forEach(r=>{(m[r.Pertandingan]=m[r.Pertandingan]||{n:r.Pertandingan,k:r.Kategori,r:[]}).r.push(r)});
+  return Object.values(m).sort((a,b)=>a.n.localeCompare(b.n))}
+const av=(a,b)=>`<div class="av${b?' big':''}"${a.f?` style="background:url('${esc(a.f)}') center/cover"`:''}>${a.f?'':esc(ini(a.n))}</div>`;
+const kpOf=n=>S.cabor.find(c=>c['Nama Cabor']===n)||{};
+const kpInfo=(n,big)=>{const c=kpOf(n);return `<div class="kp${big?' big':''}"><div><small>👤 Ketua Cabor</small><b>${esc(String(c['Ketua Cabor']||'').trim()||'-')}</b></div>${String(c.Kategori||'').trim()?`<div><small>🏷️ Kategori</small><b>${esc(String(c.Kategori).trim())}</b></div>`:''}</div>`};
+const KAT=['Beregu','Perorangan'],hasD=c=>c.pt>0||c.a>0;
+const caborList=kat=>{const m={};S.cabor.forEach(c=>c['Nama Cabor']&&(m[c['Nama Cabor']]=1));S.atlet.forEach(r=>r.Cabor&&(m[r.Cabor]=1));
+  return Object.keys(m).sort((a,b)=>a.localeCompare(b)).map(n=>({n,pt:pertOf(n).filter(p=>!kat||p.k===kat).length,a:S.ath.filter(x=>x.c===n&&(!kat||x.p.some(r=>r.Kategori===kat))).length,m:mcount(S.atlet.filter(r=>r.Cabor===n&&(!kat||r.Kategori===kat)))}))};
+const fmtD=d=>{try{return new Date(d).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
+function newsCard(b){return `<div class="card h" onclick="readNews('${esc(b.ID)}')"><div class="img" style="${b.Gambar?`background-image:url('${esc(b.Gambar)}')`:''}">${b.Gambar?'':'📰'}</div><div class="pd"><small>${esc(fmtD(b.Tanggal))}</small><h3>${esc(b.Judul)}</h3><p>${esc(b.Ringkasan)}</p></div></div>`}
+function home(){
+  const m=medals(),cb=caborList().length;
+  return `<div class="hero"><div class="w"><div class="hl"><img src="${LOGO}" alt="Logo KONI HSU"></div><span class="tag">🏅 Komite Olahraga Nasional Indonesia</span>
+  <h1>Membangun <span>Prestasi</span> Olahraga Hulu Sungai Utara</h1>
+  <p>Portal resmi informasi cabang olahraga, atlet berprestasi, dan berita terbaru KONI Kab. Hulu Sungai Utara.</p></div></div>
+  <div class="w"><div class="stats">
+  ${[[cb,'Cabang Olahraga','🏟️'],[S.atlet.length,'Atlet Berprestasi','🏃'],[m.Emas,'Medali Emas','🥇'],[m.Perak,'Medali Perak','🥈'],[m.Perunggu,'Medali Perunggu','🥉']].map(x=>`<div class="st"><i>${x[2]}</i><b data-c="${x[0]}">0</b><span>${x[1]}</span></div>`).join('')}
+  </div><p class="cap">🏅 <b>Prestasi Kontingen Hulu Sungai Utara pada Porprov 2025</b> · jumlah medali dihitung per atlet</p></div>
+`;
 }
-function folder_() { return folderBy_('FOTO_FOLDER', 'KONI HSU - Foto Berita'); }
-/** Jalankan SEKALI dari editor untuk memberi izin akses Google Drive & membuat folder. */
-function izinkanDrive() {
-  folder_();
-  folderBy_('FOTO_PROFIL_FOLDER', 'KONI HSU - Foto Profil Atlet');
-  Logger.log('Folder Drive siap.');
-}
+function count(){document.querySelectorAll('[data-c]').forEach(el=>{const t=+el.dataset.c;let n=0;const st=Math.max(1,Math.ceil(t/40));const iv=setInterval(()=>{n=Math.min(t,n+st);el.textContent=n;if(n>=t)clearInterval(iv)},25)})}
+const isBerita=()=>page==='berita'||page==='artikel'||page==='media';
+const embedUrl=u=>{u=String(u||'').trim();let m=u.match(/instagram\.com\/(?:[\w.]+\/)?(reels?|p|tv)\/([\w-]+)/i);if(m)return{u:'https://www.instagram.com/'+(m[1].toLowerCase().startsWith('reel')?'reel':m[1].toLowerCase())+'/'+m[2]+'/embed',t:'ig'};
+  m=u.match(/(?:youtu\.be\/|[?&]v=|shorts\/|embed\/)([\w-]{11})/);if(m)return{u:'https://www.youtube.com/embed/'+m[1],t:'yt'};return null};
+function mediaCard(b){const e=embedUrl(b['Link Video']);if(!e)return newsCard(b);
+  return `<div class="card"><div class="vid ${e.t}"><iframe src="${esc(e.u)}" loading="lazy" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="${esc(b.Judul)}"></iframe></div><div class="pd"><small>${esc(fmtD(b.Tanggal))}</small><h3>${esc(b.Judul)}</h3><p>${esc(b.Ringkasan)}</p></div></div>`}
+const IG_USER='konikab.hsu';let IGV=null,IGN=9;
+let IGE='';
+function igCards(a){return a.map(v=>{const e=embedUrl(v.p);if(!e)return '';return `<div class="card"><div class="vid ig"><iframe src="${esc(e.u)}" loading="lazy" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="Video Instagram KONI HSU"></iframe></div><div class="pd">${v.d?`<small>${esc(fmtD(v.d))}</small>`:''}${v.c?`<p>${esc(v.c)}</p>`:''}</div></div>`}).join('')}
+function igBox(){if(IGV===null||IGV==='loading')return '<div class="ld">Memuat Instagram…</div>';if(!IGV.length)return `<div class="ld">Postingan belum bisa dimuat${IGE?' ('+esc(IGE)+')':''}.<br>Silakan buka langsung di <a href="https://www.instagram.com/${IG_USER}/reels/" target="_blank" rel="noopener">Instagram @${IG_USER}</a>.</div>`;return '<div class="grid g3">'+igCards(IGV.slice(0,IGN))+'</div>'+(IGV.length>IGN?`<div style="text-align:center;margin:22px 0"><button class="btn" onclick="IGN+=9;document.getElementById('igv').innerHTML=igBox()">Muat lebih banyak</button></div>`:'')}
+function igLoad(){if(IGV!==null)return;IGV='loading';run('igMedia').then(d=>{IGV=(d&&d.items)||[];IGE=(d&&d.error)||''}).catch(e=>{IGV=[];IGE=(e&&e.message)||'gagal terhubung'}).then(()=>{const el=document.getElementById('igv');if(el)el.innerHTML=igBox()})}
+function igFeed(){igLoad();return `<div id="igv">${igBox()}</div>`}
+function igpage(){return hd('<span>Instagram</span>','Akun resmi @'+IG_USER,'Instagram')+`<div class="w pg">${igFeed()}</div>`}
+function berita(){const md=page==='media';
+  return (md?hd('Media <span>KONI HSU</span>','Liputan, foto, dan publikasi media KONI Hulu Sungai Utara','🎬 Media'):hd('Artikel <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Artikel'))+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari ${md?'media':'artikel'}…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
+function beritaBody(){const kat=page==='media'?'Media':'Artikel',q=bq.toLowerCase(),all=S.berita.filter(b=>(String(b.Kategori||'').trim().toLowerCase()||'artikel')===kat.toLowerCase()),f=all.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q)),nm=kat.toLowerCase();
+  return f.length?`<p class="sub">${f.length} ${nm}</p><div class="grid">${f.map(kat==='Media'?mediaCard:newsCard).join('')}</div>`:`<p class="sub">${all.length?(kat+' tidak ditemukan.'):'Belum ada '+nm+'.'}</p>`}
+function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)return;
+  openM(`<small style="color:var(--r);font-weight:700">${esc(fmtD(b.Tanggal))}</small><h2 style="margin:6px 0 14px">${esc(b.Judul)}</h2>${b.Gambar?`<img src="${esc(b.Gambar)}" style="width:100%;border-radius:16px;margin-bottom:14px">`:''}<div>${lines(b.Isi||b.Ringkasan).map(p=>`<p style="margin-bottom:10px">${esc(p).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--r);word-break:break-all">$1</a>')}</p>`).join('')}</div><br><button class="btn g" onclick="closeM()">Tutup</button>`)}
+function profil(){const p=S.profil;
+  return hd('Profile <span>KONI HSU</span>','Mengenal organisasi, visi, dan misi kami','🏛️ Profil Organisasi')+`
+  <div class="pfw"><div class="w pg pf"><div class="box vs rv"><h3>🎯 Visi</h3><p>${esc(p.visi)}</p></div>
+  <div class="box rv"><h3>🚀 Misi</h3><ol>${lines(p.misi).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div>
+  <div class="box rv"><h3>👥 Struktur Organisasi</h3><div class="org">${lines(p.struktur).map((l,i)=>{const[a,b]=l.split('|'),nm=(b||'').trim();return `<div class="${i===0?'top':''}"><span class="oa">${esc(ini(nm))}</span><small>${esc((a||'').trim())}</small><b>${esc(nm)}</b></div>`}).join('')}</div></div>
+  <div class="box rv"><h3>📍 Kontak</h3><p>${esc(p.alamat)}<br>Telp: ${esc(p.telepon)} · Email: ${esc(p.email)}</p></div></div></div>`}
+const hd=(t,p,g)=>`<div class="ph"><div class="w"><span class="tag">${g||'🏅 KONI Hulu Sungai Utara'}</span><h1>${t}</h1><p>${p}</p></div></div>`;
+const MED=['Emas','Perak','Perunggu'];
+const opt=(l,v)=>l.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
+function upd(){$('#cl').innerHTML=isBerita()?beritaBody():page==='cabor'?(cs?cDetail():cList()):page==='atlet'?atBody():prBody()}
+/* ---- Cabang Olahraga ---- */
+const chips=(list,cur,fn)=>`<div class="tabs">${list.map(([v,l])=>`<button class="${cur===v?'on':''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
+function setCk(v){ck=v;render()}
+function cabor(){
+  if(cs){const ks=[...new Set(pertOf(cs).map(p=>p.k))].filter(k=>KAT.includes(k));
+    const inf=`<div class="box">${kpInfo(cs,1)}</div>`;
+    return hd(`<span>${esc(cs)}</span>`+(ck?` · ${ck}`:''),'Jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg"><div class="fx" style="margin-bottom:14px;justify-content:flex-end"><button class="btn backbtn" onclick="cs='';render()">← Semua Cabang Olahraga</button></div>${inf}
+    ${ks.length>1?chips([['','Semua'],...ks.map(k=>[k,k])],ck,'setCk'):''}
+    <div class="tabs">${[['pert','🎯 Jenis Pertandingan'],['atlet','🏃 Atlet']].map(([k,l])=>`<button class="${ct===k?'on':''}" onclick="ct='${k}';lim=100;render()">${l}</button>`).join('')}</div><div id="cl">${cDetail()}</div></div>`}
+  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"><select onchange="kc=this.value;upd()"><option value="">Semua Kategori</option>${opt(katList(),kc)}</select></div><div id="cl">${cList()}</div></div>`}
+const katList=()=>{const m=S.kategoricabor.map(k=>String(k['Nama Kategori']||'').trim()).filter(Boolean);S.cabor.forEach(c=>{const k=String(c.Kategori||'').trim();if(k&&!m.includes(k))m.push(k)});return m};
+function cList(){const q=cq.toLowerCase(),ok=c=>c.n.toLowerCase().includes(q)&&(!kc||String(kpOf(c.n).Kategori||'').trim()===kc);CL=[];
+  const card=(c,k)=>{CL.push({n:c.n,k});return `<div class="card h cb" onclick="pick(${CL.length-1})"><h3>${esc(c.n)}</h3><div class="md"><span class="bd">🏃 ${c.a} atlet</span><span class="bd">🎯 ${c.pt} pertandingan</span></div>${kpInfo(c.n)}</div>`};
+  const l=caborList().filter(ok);
+  const h=l.length?`<h2 class="sec">Daftar Cabang Olahraga <span class="bd">${l.length} cabor</span></h2><div class="grid">${l.map(c=>card(c,'')).join('')}</div>`:'';
+  return h||'<p class="sub">Cabang olahraga tidak ditemukan.</p>'}
+function pick(i){cs=CL[i].n;ck=CL[i].k;ct='pert';lim=100;render()}
+function cDetail(){return ct==='pert'?pertView():athGrid(S.ath.filter(a=>a.c===cs&&(!ck||a.p.some(r=>r.Kategori===ck))))}
+function pertView(){const f=pertOf(cs).filter(p=>!ck||p.k===ck);
+  return f.length?`<p class="sub">${f.length} jenis pertandingan</p><div class="tw"><table><tr><th>Pertandingan</th><th>Kategori</th><th>Medali Porprov 2025</th></tr>${f.map(p=>`<tr><td>${esc(p.n)}</td><td>${esc(p.k)}</td><td>${mbadge(mcount(p.r))}</td></tr>`).join('')}</table></div>`:'<p class="sub">Belum ada data jenis pertandingan.</p>'}
+/* ---- Atlet ---- */
+const katOf=n=>String(kpOf(n).Kategori||'').trim();
+function atlet(){const cl=caborList().map(c=>c.n).filter(n=>!ak||katOf(n)===ak);
+  return hd('Profil <span>Atlet</span>','Profil atlet KONI Hulu Sungai Utara','🏃 Atlet')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari nama atlet…" value="${esc(aq)}" oninput="aq=this.value;lim=100;upd()"><select onchange="ak=this.value;ac='';lim=100;render()"><option value="">Semua Kategori Cabor</option>${opt(katList(),ak)}</select><select onchange="ac=this.value;lim=100;upd()"><option value="">Semua Cabang Olahraga</option>${opt(cl,ac)}</select></div><div id="cl">${atBody()}</div></div>`}
+function atBody(){const q=aq.toLowerCase();return athGrid(S.ath.filter(a=>(!ac||a.c===ac)&&(!ak||katOf(a.c)===ak)&&(!q||a.n.toLowerCase().includes(q))))}
+function athGrid(f){return f.length?`<p class="sub">${f.length} atlet</p><div class="grid g3">${f.slice(0,lim).map(a=>`<div class="card h ath" onclick="readAth(${S.ath.indexOf(a)})">${av(a)}<div><b>${esc(a.n)}</b><small>${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</small>${mbadge(mcount(a.p))}</div></div>`).join('')}</div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`:'<p class="sub">Atlet tidak ditemukan.</p>'}
+function readAth(i){const a=S.ath[i];
+  openM(`<div class="fx" style="justify-content:flex-start;gap:16px;margin-bottom:16px">${av(a,1)}<div><h2 style="margin:0">${esc(a.n)}</h2><p style="color:var(--m)">${esc(a.c)}${a.jk?' · '+esc(a.jk):''}</p></div></div>${mbadge(mcount(a.p))}<h3 style="margin:18px 0 6px">Prestasi Porprov 2025</h3>${a.p.length?a.p.map(r=>`<div class="pr"><div><b>${esc(r.Pertandingan)}</b><small>${esc(r.Kategori)}</small></div><span class="bd ${esc(r.Medali)}">${esc(r.Medali||'-')}</span></div>`).join(''):'<p class="sub">Belum ada data prestasi.</p>'}<br><button class="btn g" onclick="closeM()">Tutup</button>`)}
+/* ---- Prestasi Atlet > Porprov 2025 ---- */
+function filt(){const q=pq.toLowerCase();return S.atlet.filter(a=>MED.includes(a.Medali)&&(!pc||a.Cabor===pc)&&(!pm||a.Medali===pm)&&(!q||[a['Nama Atlet'],a.Pertandingan,a.Cabor].join(' ').toLowerCase().includes(q)))}
+function porprov(){const m=medals(),tot=m.Emas+m.Perak+m.Perunggu;
+  return hd('Prestasi Atlet · <span>Porprov 2025</span>','Daftar atlet Hulu Sungai Utara yang meraih medali pada Porprov 2025','🥇 Prestasi Atlet')+`<div class="w pg"><div class="stats" style="margin:0 0 24px">${[[tot,'Total Medali'],[m.Emas,'🥇 Emas'],[m.Perak,'🥈 Perak'],[m.Perunggu,'🥉 Perunggu']].map(x=>`<div class="st"><b>${x[0]}</b><span>${x[1]}</span></div>`).join('')}</div>
+  <div class="bar"><input placeholder="🔍 Cari atlet / pertandingan…" value="${esc(pq)}" oninput="pq=this.value;lim=100;upd()"><select onchange="pc=this.value;lim=100;upd()"><option value="">Semua Cabor</option>${opt(caborList().map(c=>c.n),pc)}</select><select onchange="pm=this.value;lim=100;upd()"><option value="">Semua Medali</option>${opt(MED,pm)}</select></div><div id="cl">${prBody()}</div></div>`}
+function prBody(){const f=filt();return `<p class="sub">${f.length} atlet peraih medali</p><div class="tw"><table><tr><th>No</th>${TABLE_COLS.map(c=>`<th>${c}</th>`).join('')}</tr>${f.slice(0,lim).map((a,n)=>`<tr><td>${n+1}</td>${TABLE_COLS.map(c=>`<td>${c==='Medali'?`<span class="bd ${esc(a[c])}">${esc(a[c])}</span>`:esc(a[c])}</td>`).join('')}</tr>`).join('')}</table></div>${f.length>lim?`<br><button class="btn" onclick="lim+=100;upd()">Tampilkan lebih banyak</button>`:''}`}
+function csv(){const f=filt(),h=Object.keys(f[0]||{});const t=[h].concat(f.map(r=>h.map(k=>r[k]))).map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download='prestasi-porprov-2025.csv';a.click()}
 
-/** jenis: 'berita' | 'profil' (publik) */
-function uploadFoto(t, dataUrl, name, jenis) {
-  auth_(t);
-  jenis = jenis || 'berita';
-  const s = String(dataUrl || ''), i = s.indexOf(',');
-  if (!s.startsWith('data:image/') || i < 0) throw new Error('Format gambar tidak valid');
-  const bytes = Utilities.base64Decode(s.slice(i + 1));
-  if (bytes.length > 5 * 1024 * 1024) throw new Error('Ukuran gambar terlalu besar (maks 5 MB)');
-  const blob = Utilities.newBlob(bytes, 'image/jpeg', jenis + '-' + Date.now() + '.jpg');
-  const file = (jenis === 'profil' ? folderBy_('FOTO_PROFIL_FOLDER', 'KONI HSU - Foto Profil Atlet') : folder_()).createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w' + (jenis === 'profil' ? 600 : 1200);
-}
-
-/** Impor data Cabor dari file Excel (Cabang_Olahraga.xlsx) ke sheet Cabor + KategoriCabor.
- *  Jalankan SEKALI dari editor: pilih fungsi imporCaborDariExcel > Run.
- *  Aman dijalankan berulang: cabor yang namanya sudah ada (tanpa membedakan huruf besar/kecil) hanya diperbarui
- *  Ketua/Kategori-nya (nama lama tetap dipakai agar relasi ke Atlet & Pertandingan tidak putus); yang belum ada ditambahkan. */
-function imporCaborDariExcel() {
-  const DATA = [ // [Nama Cabor, Ketua Cabor, Kategori]
-    ["Aeromodelling", "Muhammad Syauqi", "Akurasi"],
-    ["Biliar", "Gusti Abdul Muhid", "Akurasi"],
-    ["Binaraga", "Dedi Syahrial", "Akurasi"],
-    ["Menembak", "Henry", "Akurasi"],
-    ["Panahan", "Ahmad Ma'rifatullah", "Akurasi"],
-    ["Senam", "Khairin Fuadi", "Akurasi"],
-    ["Ski Air", "Wahyudi Ramadhan", "Akurasi"],
-    ["Gateball", "Akhmad Novrizal Rahman", "Akurasi"],
-    ["Dance", "Alma Haslinda", "Akurasi"],
-    ["Golf", "Marhaini", "Akurasi"],
-    ["Anggar", "H. Abd. Haris", "Bela Diri"],
-    ["Gulat", "Nurullah Bakti", "Bela Diri"],
-    ["Ju-Jitsu", "Moch. Yandi Fitriyadi", "Bela Diri"],
-    ["Judo", "Yudi", "Bela Diri"],
-    ["Karate", "Alpianor", "Bela Diri"],
-    ["Kempo", "M. Sholahuddin", "Bela Diri"],
-    ["Kick Boxing", "Muhammad Ali Hasyim", "Bela Diri"],
-    ["Kurash", "Risa Zuardi", "Bela Diri"],
-    ["Mma", "Nurullah Bakti", "Bela Diri"],
-    ["Muaythai", "Agus Wahyudi", "Bela Diri"],
-    ["Pencak Silat", "H. Rusmuliadi", "Bela Diri"],
-    ["Taekwondo", "Rusilawati", "Bela Diri"],
-    ["Tinju", "Sertu Setiyo", "Bela Diri"],
-    ["Wushu", "Ahmad Jami'at", "Bela Diri"],
-    ["Sambo", "M.Maulana Akbar", "Bela Diri"],
-    ["Hapkido", "Khairi Hanani", "Bela Diri"],
-    ["Bulu Tangkis", "Abdur Rohim", "Permainan"],
-    ["Bola Tangan", "Rahmat Noor Ridhani", "Permainan"],
-    ["Bridge", "Hj. Aniwarni", "Permainan"],
-    ["Catur", "Ahmad Raihan Hasa", "Permainan"],
-    ["Drum Band", "Hendra Royadi", "Permainan"],
-    ["E-Sport", "Rasi Akio Dyusuf Banjari", "Permainan"],
-    ["Futsal", "Yudhi Rifani", "Permainan"],
-    ["Petanque", "H. Sugianor", "Permainan"],
-    ["Pickleball", "Bambang Mardianto", "Permainan"],
-    ["Sepak Takraw", "Alma Haslinda", "Permainan"],
-    ["Sepak Bola", "H. Sahrujani", "Permainan"],
-    ["Tenis Lapangan", "Syaifullah", "Permainan"],
-    ["Teqball", "Noorfadillah", "Permainan"],
-    ["Padel", "Moch. Arifil", "Permainan"],
-    ["Sepatu Roda", "Fazri Zamzami", "Permainan"],
-    ["Bola Voli", "KAPOLRES HSU", "Permainan"],
-    ["Bola Basket", "KODIM HSU", "Permainan"],
-    ["Tenis Meja", "H. Sayuti", "Permainan"],
-    ["Angkat Berat", "Yudi", "Terukur"],
-    ["Angkat Besi", "Agus Heriadi", "Terukur"],
-    ["Atletik", "Asikin Noor", "Terukur"],
-    ["Balap Motor", "H.Bangbang", "Terukur"],
-    ["Balap Sepeda", "H.Masbudianto", "Terukur"],
-    ["Panjat Tebing", "Irhamudin", "Terukur"],
-    ["Renang", "Amin Saifullah", "Terukur"],
-    ["Dayung", "Ayan", "Terukur"],
-    ["Triathlon", "Fani Wijaya", "Terukur"]
-  ];
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try {
-    const sh = sheet_('Cabor'), H = SHEETS.Cabor, n = H.length, lr = sh.getLastRow();
-    const cur = lr > 1 ? sh.getRange(2, 1, lr - 1, n).getValues() : [];
-    const idx = {}; cur.forEach((r, i) => { idx[String(r[1]).trim().toLowerCase()] = i; });
-    let upd = 0; const baru = [];
-    DATA.forEach(d => {
-      const k = d[0].trim().toLowerCase();
-      if (k in idx) { const r = cur[idx[k]]; r[2] = d[1]; r[3] = d[2]; upd++; }
-      else baru.push([Utilities.getUuid().slice(0, 8), d[0], d[1], d[2]]);
-    });
-    if (cur.length) sh.getRange(2, 1, cur.length, n).setValues(cur);
-    if (baru.length) {
-      const start = sh.getLastRow() + 1;
-      if (start + baru.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), baru.length + 50);
-      sh.getRange(start, 1, baru.length, n).setValues(baru);
-    }
-    // pastikan semua kategori ada di sheet KategoriCabor
-    const ks = sheet_('KategoriCabor'), klr = ks.getLastRow();
-    const ada = new Set((klr > 1 ? ks.getRange(2, 2, klr - 1, 1).getValues() : []).map(r => String(r[0]).trim().toLowerCase()));
-    const kb = [...new Set(DATA.map(d => d[2]).filter(Boolean))].filter(x => !ada.has(x.toLowerCase())).map(x => [Utilities.getUuid().slice(0, 8), x]);
-    if (kb.length) ks.getRange(klr + 1, 1, kb.length, 2).setValues(kb);
-    patchCache_('Cabor'); patchCache_('KategoriCabor');
-    const msg = 'Impor selesai: ' + baru.length + ' cabor ditambahkan, ' + upd + ' diperbarui, ' + kb.length + ' kategori baru.';
-    Logger.log(msg); return msg;
-  } finally { lock.releaseLock(); }
-}
-
-
-/** Impor Data Atlet dari file Excel (Data_Atlet.xlsx) ke sheet DataAtlet (menu Data Atlet di Admin).
- *  Jalankan SEKALI dari editor: pilih fungsi imporDataAtletDariExcel > Run (sebaiknya setelah imporCaborDariExcel).
- *  Aman dijalankan berulang: atlet dengan Nama + Cabor yang sama (huruf besar/kecil diabaikan) tidak digandakan —
- *  hanya Jenis Kelamin yang diisi/diperbarui; foto, alamat, dsb. yang sudah ada tidak disentuh. */
-function imporDataAtletDariExcel() {
-  const DATA = [ // [Nama Atlet, Cabor, Jenis Kelamin]
-    ["Muhammad Irgi", "Anggar", "Laki-laki"],
-    ["Muhammad Syauqi", "Anggar", "Laki-laki"],
-    ["Ibnu Muhammad", "Anggar", "Laki-laki"],
-    ["Muhammad Juhdi Al Khalafi", "Anggar", "Laki-laki"],
-    ["Paisal", "Anggar", "Laki-laki"],
-    ["Muhammad Fiqri", "Anggar", "Laki-laki"],
-    ["Muhammad Muslim", "Anggar", "Laki-laki"],
-    ["Mahmudah", "Anggar", "Perempuan"],
-    ["Sukma Adila", "Anggar", "Perempuan"],
-    ["Lufia Zulfa Azizah", "Anggar", "Perempuan"],
-    ["Nailah Rizqi Kamilah", "Anggar", "Perempuan"],
-    ["Adhli Rifa`I", "Gulat", "Laki-laki"],
-    ["Azrul Wahyu Pahriza", "Gulat", "Laki-laki"],
-    ["Yusman", "Gulat", "Laki-laki"],
-    ["M. Andry", "Gulat", "Laki-laki"],
-    ["Rifky Charisma", "Gulat", "Laki-laki"],
-    ["M.Amin Ramadani", "Gulat", "Laki-laki"],
-    ["Azra Wahyu Pahriza", "Gulat", "Laki-laki"],
-    ["Suriansyah", "Gulat", "Laki-laki"],
-    ["Muhammad Said Zikri", "Gulat", "Laki-laki"],
-    ["Afiya Nur Faliha", "Gulat", "Perempuan"],
-    ["Adelia Sahda Farras", "Gulat", "Perempuan"],
-    ["Faisal Ajis", "Judo", "Laki-laki"],
-    ["Fuzi Maulana", "Judo", "Laki-laki"],
-    ["Akbar Mustaqim", "Judo", "Laki-laki"],
-    ["Zidan Mustaqim", "Judo", "Laki-laki"],
-    ["M. Arsyad", "Judo", "Laki-laki"],
-    ["Novitasari", "Judo", "Perempuan"],
-    ["Nor Maulida", "Judo", "Perempuan"],
-    ["Ahmad Ridha Fahlipi", "Ju-Jitsu", "Laki-laki"],
-    ["Ahmad Noor", "Ju-Jitsu", "Laki-laki"],
-    ["Najib Ahmadul Wafi", "Ju-Jitsu", "Laki-laki"],
-    ["Muhammad Furqan", "Ju-Jitsu", "Laki-laki"],
-    ["Muhammad Hifni", "Ju-Jitsu", "Laki-laki"],
-    ["M. Ridwan", "Ju-Jitsu", "Laki-laki"],
-    ["Muhammad Yanor", "Ju-Jitsu", "Laki-laki"],
-    ["Norlatifah", "Ju-Jitsu", "Perempuan"],
-    ["Muhammad Hafiz Ihsanul Haqqi", "Karate", "Laki-laki"],
-    ["Muhammad Rif`At", "Karate", "Laki-laki"],
-    ["Muhaimin Rudi", "Karate", "Laki-laki"],
-    ["Ahmad Yogi Suryatama", "Karate", "Laki-laki"],
-    ["Dian Permana Surya", "Karate", "Laki-laki"],
-    ["Muhammad Raditya Darius", "Karate", "Laki-laki"],
-    ["Yandi", "Karate", "Laki-laki"],
-    ["Muhammad Afif Syahbana", "Karate", "Laki-laki"],
-    ["Ratna", "Karate", "Perempuan"],
-    ["Daffina Al-Fathira Ramadhania", "Karate", "Perempuan"],
-    ["Avaralia Syafaranci Sampulawa", "Karate", "Perempuan"],
-    ["Munadillah Al Munirah", "Karate", "Perempuan"],
-    ["Siti Halidah", "Karate", "Perempuan"],
-    ["Puteri", "Karate", "Perempuan"],
-    ["Amelia", "Karate", "Perempuan"],
-    ["Syahraza Zeriany", "Karate", "Perempuan"],
-    ["Arif", "Kempo", "Laki-laki"],
-    ["Tajeliani", "Kempo", "Laki-laki"],
-    ["Hasan Thaib", "Kempo", "Laki-laki"],
-    ["Hakimi Rafsanjani", "Kempo", "Laki-laki"],
-    ["Muhammad Junaidi", "Kempo", "Laki-laki"],
-    ["Sariyu Erwan", "Kempo", "Laki-laki"],
-    ["Muhammad Erpani", "Kempo", "Laki-laki"],
-    ["Muhammad Sufi Anshari", "Kempo", "Laki-laki"],
-    ["Rindiani", "Kempo", "Perempuan"],
-    ["Namira Oktaviani", "Kempo", "Perempuan"],
-    ["Muhammad Arif Aulia", "Kick Boxing", "Laki-laki"],
-    ["Muhammad Rasyid Ridho", "Kick Boxing", "Laki-laki"],
-    ["Wardana", "Kick Boxing", "Laki-laki"],
-    ["Sahrul Gunawan", "Kick Boxing", "Laki-laki"],
-    ["M. Abdur Rahman", "Kick Boxing", "Laki-laki"],
-    ["Muhammad Raka Yahdinoor", "Kick Boxing", "Laki-laki"],
-    ["Akbar Firdaus Sriwiezaya", "Kick Boxing", "Laki-laki"],
-    ["Muhammad Zaini", "Kick Boxing", "Laki-laki"],
-    ["A. Rhamadhani J. K", "Kick Boxing", "Laki-laki"],
-    ["Syahdan Arya Saputra", "Kick Boxing", "Laki-laki"],
-    ["Elsa Sari", "Kick Boxing", "Perempuan"],
-    ["Dahlia", "Kick Boxing", "Perempuan"],
-    ["Vivi Astri Aninur", "Kick Boxing", "Perempuan"],
-    ["Nanda Nur Annisa Putri", "Kick Boxing", "Perempuan"],
-    ["Muhammad Aulia", "Kurash", "Laki-laki"],
-    ["Alfi", "Kurash", "Laki-laki"],
-    ["Muhammad Muhajir", "Kurash", "Laki-laki"],
-    ["Rizwar Indra Saputra", "Kurash", "Laki-laki"],
-    ["Fahrur Rozi", "Kurash", "Laki-laki"],
-    ["Muhammad Alawi", "Kurash", "Laki-laki"],
-    ["Setia Wati Helmida", "Kurash", "Perempuan"],
-    ["Zikrina Alisa", "Kurash", "Perempuan"],
-    ["Norhasanah", "Kurash", "Perempuan"],
-    ["M. Rajib Hairiani", "Mma", "Laki-laki"],
-    ["A. Khairin", "Mma", "Laki-laki"],
-    ["M. Yani", "Mma", "Laki-laki"],
-    ["Chanravi Arda Hadyatyan Putra", "Mma", "Laki-laki"],
-    ["Catur Teguh Pambudi", "Mma", "Laki-laki"],
-    ["Muhammad Noor Habibie", "Mma", "Laki-laki"],
-    ["Muhammad Rhaditya Alam", "Mma", "Laki-laki"],
-    ["Salamad Ravani", "Mma", "Laki-laki"],
-    ["Siti Rahmah", "Mma", "Perempuan"],
-    ["Ahmad Riva’I", "Muaythai", "Laki-laki"],
-    ["Aminullah", "Muaythai", "Laki-laki"],
-    ["Dzaki Nur Rahman", "Muaythai", "Laki-laki"],
-    ["M. Rifaldi", "Muaythai", "Laki-laki"],
-    ["Muhammad Nor Azmi", "Muaythai", "Laki-laki"],
-    ["Randy Al Fathur Rohman", "Muaythai", "Laki-laki"],
-    ["Hifni Al Khairi", "Muaythai", "Laki-laki"],
-    ["Khafizatun Zawra Norrizky", "Muaythai", "Perempuan"],
-    ["Hamidah", "Muaythai", "Perempuan"],
-    ["Tsamir Thalib", "Pencak Silat", "Laki-laki"],
-    ["Yuspa Naparin", "Pencak Silat", "Laki-laki"],
-    ["Muhammad Hisbullah", "Pencak Silat", "Laki-laki"],
-    ["M. Haikal Akbar", "Pencak Silat", "Laki-laki"],
-    ["Billy Yahya Saragih", "Pencak Silat", "Laki-laki"],
-    ["M. Ridha Anshari", "Pencak Silat", "Laki-laki"],
-    ["Muhammad Fazri", "Pencak Silat", "Laki-laki"],
-    ["Muhammad Saparudin", "Pencak Silat", "Laki-laki"],
-    ["Ambiya", "Pencak Silat", "Laki-laki"],
-    ["Sarjudin", "Pencak Silat", "Laki-laki"],
-    ["Ana Soraya", "Pencak Silat", "Perempuan"],
-    ["Farah Elissya Ni’Mah", "Pencak Silat", "Perempuan"],
-    ["Rizki Khairini, S.Pd", "Pencak Silat", "Perempuan"],
-    ["Maulidya Aurelian Noor", "Pencak Silat", "Perempuan"],
-    ["Regina Aprilia Putri Az-Zahra", "Pencak Silat", "Perempuan"],
-    ["Nur Ramadhania", "Pencak Silat", "Perempuan"],
-    ["Ihsanul Amin", "Taekwondo", "Laki-laki"],
-    ["Muhammad Husein Azmi", "Taekwondo", "Laki-laki"],
-    ["Ahmad Nahrey El Fadhalah", "Taekwondo", "Laki-laki"],
-    ["Rio Alif Al Ghazali", "Taekwondo", "Laki-laki"],
-    ["Wana", "Taekwondo", "Perempuan"],
-    ["Ahmad Al Fauzan", "Tinju", "Laki-laki"],
-    ["Hamidi", "Tinju", "Laki-laki"],
-    ["M.Raihan", "Tinju", "Laki-laki"],
-    ["A. Rhadian Nashir", "Tinju", "Laki-laki"],
-    ["Syaifullah", "Tinju", "Laki-laki"],
-    ["M.Hafi Maturidi", "Tinju", "Laki-laki"],
-    ["Abd Hamid", "Tinju", "Laki-laki"],
-    ["M.Imam Firdaus", "Tinju", "Laki-laki"],
-    ["Muhammad Haikal", "Tinju", "Laki-laki"],
-    ["Anisa Noraida", "Tinju", "Perempuan"],
-    ["Muhammad Ahlunnazar", "Wushu", "Laki-laki"],
-    ["Muhammad Irfan", "Wushu", "Laki-laki"],
-    ["Ahmad Firdaus Al Banjari", "Wushu", "Laki-laki"],
-    ["M. Fazar", "Wushu", "Laki-laki"],
-    ["Muhammad Zajuli Rahman", "Wushu", "Laki-laki"],
-    ["Nurhalipah", "Wushu", "Perempuan"],
-    ["Rabiatul Adawiyah", "Wushu", "Perempuan"],
-    ["Putri Sulastri", "Wushu", "Perempuan"],
-    ["Rahmad Hidayat", "Angkat Berat", "Laki-laki"],
-    ["Hendra", "Angkat Berat", "Laki-laki"],
-    ["Indra Alfian", "Angkat Berat", "Laki-laki"],
-    ["Faisal Basir", "Angkat Berat", "Laki-laki"],
-    ["Nurdiana", "Angkat Berat", "Perempuan"],
-    ["Rif'Ati Balkis", "Angkat Berat", "Perempuan"],
-    ["Maisarah", "Angkat Berat", "Perempuan"],
-    ["M. Nabiel Ramadhan", "Angkat Besi", "Laki-laki"],
-    ["Muhammad Arjun", "Angkat Besi", "Laki-laki"],
-    ["Radian", "Angkat Besi", "Laki-laki"],
-    ["Muhammad Alfianor", "Angkat Besi", "Laki-laki"],
-    ["Muhammad Aabdala", "Angkat Besi", "Laki-laki"],
-    ["Dinda Wahyu Agustina", "Angkat Besi", "Perempuan"],
-    ["Safira Marwa Nuridha", "Angkat Besi", "Perempuan"],
-    ["Safa Fauza Yasmin", "Angkat Besi", "Perempuan"],
-    ["Muhammad Taufiqorahman", "Atletik", "Laki-laki"],
-    ["Arif Anugerah Illahi", "Atletik", "Laki-laki"],
-    ["M. Rabbani", "Atletik", "Laki-laki"],
-    ["Maki", "Atletik", "Laki-laki"],
-    ["M. Jibril Azzerillya Bangsawan", "Atletik", "Laki-laki"],
-    ["M. Abdussalam", "Atletik", "Laki-laki"],
-    ["Aditiya Rahman", "Atletik", "Laki-laki"],
-    ["Ahmad Hafizi", "Atletik", "Laki-laki"],
-    ["Baihaki", "Atletik", "Laki-laki"],
-    ["Ridani", "Atletik", "Laki-laki"],
-    ["Halida Ulfah", "Atletik", "Perempuan"],
-    ["Hayatus Sifa", "Atletik", "Perempuan"],
-    ["Alya Rahmah", "Atletik", "Perempuan"],
-    ["Sida Septiani", "Atletik", "Perempuan"],
-    ["M. Rizky Saputra", "Balap Sepeda", "Laki-laki"],
-    ["Agus Ramadhan", "Balap Sepeda", "Laki-laki"],
-    ["Melinda Ayu Putri", "Balap Sepeda", "Perempuan"],
-    ["Yiny Marisa", "Balap Sepeda", "Perempuan"],
-    ["Ahmad Syahidin", "Dayung", "Laki-laki"],
-    ["Nasrullah", "Dayung", "Laki-laki"],
-    ["Aulia Rahman", "Dayung", "Laki-laki"],
-    ["Ahmad Fauzi", "Dayung", "Laki-laki"],
-    ["Junaidi", "Dayung", "Laki-laki"],
-    ["Khairudin", "Dayung", "Laki-laki"],
-    ["Munadi", "Dayung", "Laki-laki"],
-    ["Ahmad Padillah", "Panjat Tebing", "Laki-laki"],
-    ["Syaiful Anwar", "Panjat Tebing", "Laki-laki"],
-    ["Muhammad As'Ari", "Panjat Tebing", "Laki-laki"],
-    ["Muhammad Zikri", "Panjat Tebing", "Laki-laki"],
-    ["Samsudin Nor", "Panjat Tebing", "Laki-laki"],
-    ["Al Afkar Muhammad Rayyan", "Panjat Tebing", "Laki-laki"],
-    ["Muhammad Azka Mubarok", "Panjat Tebing", "Laki-laki"],
-    ["Ahmad Zaki Imran", "Panjat Tebing", "Laki-laki"],
-    ["St. Norjannatul Hasanah", "Panjat Tebing", "Perempuan"],
-    ["Nazirah", "Panjat Tebing", "Perempuan"],
-    ["Dahlia", "Panjat Tebing", "Perempuan"],
-    ["Raudhatul Jannah", "Panjat Tebing", "Perempuan"],
-    ["Suci Aliya", "Panjat Tebing", "Perempuan"],
-    ["Lani", "Renang", "Laki-laki"],
-    ["Naufal Rasyid R", "Renang", "Laki-laki"],
-    ["Syahrul Afli Rahman", "Renang", "Laki-laki"],
-    ["Ayunisa Ika Agustin", "Renang", "Perempuan"],
-    ["Taufik Rahman", "Aeromodelling", "Laki-laki"],
-    ["Nurul Fajeri", "Aeromodelling", "Laki-laki"],
-    ["Badarudin", "Aeromodelling", "Laki-laki"],
-    ["Devy Braja Mutaqin", "Aeromodelling", "Laki-laki"],
-    ["Akhmad Hermani", "Aeromodelling", "Laki-laki"],
-    ["Masmuriyadi", "Biliar", "Laki-laki"],
-    ["Sopian Anwar", "Biliar", "Laki-laki"],
-    ["Sukma Adeani", "Biliar", "Laki-laki"],
-    ["Radiansyah", "Biliar", "Laki-laki"],
-    ["Rollie Prasetiawan", "Biliar", "Laki-laki"],
-    ["Ahmad Zaini", "Biliar", "Laki-laki"],
-    ["Akhmad Marjuki", "Biliar", "Laki-laki"],
-    ["Sella Sri Rahayu", "Biliar", "Perempuan"],
-    ["Khairunnisa Zulfa", "Biliar", "Perempuan"],
-    ["Junia Christine", "Biliar", "Perempuan"],
-    ["H Akhmad Zaky", "Binaraga", "Laki-laki"],
-    ["Rizwan Abdillah", "Binaraga", "Laki-laki"],
-    ["Riyan Hermawan", "Binaraga", "Laki-laki"],
-    ["Juari", "Golf", "Laki-laki"],
-    ["Yunadi", "Golf", "Laki-laki"],
-    ["H. Samsunie", "Golf", "Laki-laki"],
-    ["Marhaini", "Golf", "Laki-laki"],
-    ["M. Yandi Gunawan", "Golf", "Laki-laki"],
-    ["Amos Silitonga", "Golf", "Laki-laki"],
-    ["Jamali", "Menembak", "Laki-laki"],
-    ["Muhammad Khairi", "Menembak", "Laki-laki"],
-    ["Muhammad Khadafi Ma'Rifatulloh", "Menembak", "Laki-laki"],
-    ["Abdullah", "Menembak", "Laki-laki"],
-    ["Ahmad Azzam Zidna Fann", "Menembak", "Laki-laki"],
-    ["Muhammad Angga", "Menembak", "Laki-laki"],
-    ["Muhammad Rifky Ramadhan", "Menembak", "Laki-laki"],
-    ["Gilang Pratama Ma'Rifatulloh", "Menembak", "Laki-laki"],
-    ["Raihan Pratama Setiawan", "Menembak", "Laki-laki"],
-    ["Zuhdi Habibi", "Menembak", "Laki-laki"],
-    ["Alifia Rosyifa", "Menembak", "Perempuan"],
-    ["Hasya Razita Balqis", "Menembak", "Perempuan"],
-    ["Khoirunnisa", "Menembak", "Perempuan"],
-    ["Azkia Khaira Ramadhana", "Menembak", "Perempuan"],
-    ["Nadira Indriana Sari", "Menembak", "Perempuan"],
-    ["Ayu Eka Utami Setyowati", "Menembak", "Perempuan"],
-    ["Nazima Yumna Azkiya Amieny", "Menembak", "Perempuan"],
-    ["Yulia Salsabila Putri", "Menembak", "Perempuan"],
-    ["Naila Hajati", "Menembak", "Perempuan"],
-    ["Ahmad Marifatullah", "Panahan", "Laki-laki"],
-    ["M. Fendi", "Panahan", "Laki-laki"],
-    ["Ihsanudin", "Panahan", "Laki-laki"],
-    ["Muhammad Rangga Hidayat", "Panahan", "Laki-laki"],
-    ["M. Fairuz Furjatullah", "Panahan", "Laki-laki"],
-    ["Ahmad Assa'Dil Alim", "Panahan", "Laki-laki"],
-    ["Muhammad Rafli Fatra", "Panahan", "Laki-laki"],
-    ["Rika Ayu Oktaviani", "Panahan", "Perempuan"],
-    ["Hidayatun Nisya", "Panahan", "Perempuan"],
-    ["Adelya Putri", "Panahan", "Perempuan"],
-    ["Karina Aurora", "Panahan", "Perempuan"],
-    ["Laura Afifatul Huda", "Panahan", "Perempuan"],
-    ["Vitriani Cahya Rahman", "Panahan", "Perempuan"],
-    ["Hafizah", "Panahan", "Perempuan"],
-    ["Alfin Sigit", "Senam", "Laki-laki"],
-    ["Muhammad Alwi", "Senam", "Laki-laki"],
-    ["Muhammad Rusmadi", "Senam", "Laki-laki"],
-    ["Ainun Nadya", "Senam", "Laki-laki"],
-    ["A. Faisal", "Senam", "Laki-laki"],
-    ["Zawita Nisrina", "Senam", "Perempuan"],
-    ["Agape Letycia Imanuel", "Senam", "Perempuan"],
-    ["Aysha Risqi Maritza", "Senam", "Perempuan"],
-    ["Nur Ariani Hidayah", "Senam", "Perempuan"],
-    ["Rahma Zahratun Nisa", "Senam", "Perempuan"],
-    ["M. Ramadhani", "Ski Air", "Laki-laki"],
-    ["Muhammad Najmi", "Ski Air", "Laki-laki"],
-    ["Reyhan Rivaldi", "Ski Air", "Laki-laki"],
-    ["Yusron Rifki", "Ski Air", "Laki-laki"],
-    ["Siti Raudah", "Ski Air", "Perempuan"],
-    ["Ahmad Barry Mahardika", "Bola Basket", "Laki-laki"],
-    ["M. Hafiz Firdaus", "Bola Basket", "Laki-laki"],
-    ["Muhammad Aditya", "Bola Basket", "Laki-laki"],
-    ["Muhammad Rifky", "Bola Basket", "Laki-laki"],
-    ["Ahmad Ahnannabili", "Bola Basket", "Laki-laki"],
-    ["Muhammad Yusuf", "Bola Basket", "Laki-laki"],
-    ["Ahmad Zuhdi Razak", "Bola Basket", "Laki-laki"],
-    ["Hanif", "Bola Basket", "Laki-laki"],
-    ["Almer Daffa Riyanto", "Bola Basket", "Laki-laki"],
-    ["Muhammad Reynaldo Nanda Abidin", "Bola Basket", "Laki-laki"],
-    ["Rifky Alvianda Prima", "Bola Basket", "Laki-laki"],
-    ["M. Dava Al Kausar", "Bola Basket", "Laki-laki"],
-    ["Muhammad Zidane Fahrezi", "Bola Basket", "Laki-laki"],
-    ["Kevin Cahyadi Bigot", "Bola Basket", "Laki-laki"],
-    ["Fahri Ahmad El Shirazy", "Bola Basket", "Laki-laki"],
-    ["Akhmad Tirta Kurniawan", "Bola Basket", "Laki-laki"],
-    ["Sahabudin Noor", "Bola Tangan", "Laki-laki"],
-    ["M. Rayhan Azmi", "Bola Tangan", "Laki-laki"],
-    ["Muhammad Andra Maevan", "Bola Tangan", "Laki-laki"],
-    ["Ahmad Rasysya Najib", "Bola Tangan", "Laki-laki"],
-    ["Aulia Fikri", "Bola Tangan", "Laki-laki"],
-    ["M. Muziannor Saputra", "Bola Tangan", "Laki-laki"],
-    ["Haitun", "Bola Tangan", "Laki-laki"],
-    ["Sintya Damayanti", "Bola Tangan", "Perempuan"],
-    ["Yuhana", "Bola Tangan", "Perempuan"],
-    ["Putri Natasya Amelia", "Bola Tangan", "Perempuan"],
-    ["Jannatun Nisa", "Bola Tangan", "Perempuan"],
-    ["Ghania Kusuma Wardani", "Bola Tangan", "Perempuan"],
-    ["Sri Hidayanti", "Bola Tangan", "Perempuan"],
-    ["Muhammad Ghifari", "Bola Voli", "Laki-laki"],
-    ["Ahmad Farhan", "Bola Voli", "Laki-laki"],
-    ["Muhammad F Gilang Pamungkas", "Bola Voli", "Laki-laki"],
-    ["Mirza Arsyadi", "Bola Voli", "Laki-laki"],
-    ["Muhammad Nauval", "Bola Voli", "Laki-laki"],
-    ["Muhammad Rafiqi", "Bola Voli", "Laki-laki"],
-    ["Teguh Saputra", "Bola Voli", "Laki-laki"],
-    ["Muhammad Irfansyah", "Bola Voli", "Laki-laki"],
-    ["Muhammad Zuhdi", "Bola Voli", "Laki-laki"],
-    ["Dennis Muhammad Fikri", "Bola Voli", "Laki-laki"],
-    ["Ridha Alditya", "Bola Voli", "Laki-laki"],
-    ["Muhrian Hamidillah Rehan", "Bola Voli", "Laki-laki"],
-    ["Adif Maulana Sifa", "Bridge", "Laki-laki"],
-    ["Ahmad Nabawi", "Bridge", "Laki-laki"],
-    ["Haykal Ahmadi Akbar", "Bridge", "Laki-laki"],
-    ["Yasir Aryanto", "Bridge", "Laki-laki"],
-    ["Muhammad Nabil", "Bridge", "Laki-laki"],
-    ["Shalma Fadhilla", "Bridge", "Perempuan"],
-    ["Nabilah Nur Ariqoh Fuadiati", "Bridge", "Perempuan"],
-    ["Leya Azizah", "Bridge", "Perempuan"],
-    ["Ahmada Cantika", "Bridge", "Perempuan"],
-    ["Ayla Sabrina", "Bridge", "Perempuan"],
-    ["Yasmin Aisha Khalila", "Bridge", "Perempuan"],
-    ["Salma Agustina", "Bridge", "Perempuan"],
-    ["Ananda Hilqom Ya'Subul Umam", "Bulu Tangkis", "Laki-laki"],
-    ["Saffarudin Aditya", "Bulu Tangkis", "Laki-laki"],
-    ["Fuadi", "Bulu Tangkis", "Laki-laki"],
-    ["M. Kahfi Riansyah", "Bulu Tangkis", "Laki-laki"],
-    ["Muhammad Budiyan", "Bulu Tangkis", "Laki-laki"],
-    ["Supian Hadi", "Bulu Tangkis", "Laki-laki"],
-    ["Muhammad Fadhil Ramadhan", "Bulu Tangkis", "Laki-laki"],
-    ["Wahyu Rizqi", "Bulu Tangkis", "Laki-laki"],
-    ["Rabelvrili Cantika Asmara", "Bulu Tangkis", "Perempuan"],
-    ["Selvi Riskia", "Bulu Tangkis", "Perempuan"],
-    ["Ahmad Raihan Hasa", "Catur", "Laki-laki"],
-    ["Ruslianoor", "Catur", "Laki-laki"],
-    ["Khairil Anwar", "Catur", "Laki-laki"],
-    ["Rony Waluya", "Catur", "Laki-laki"],
-    ["Daru Okta Buana", "Catur", "Laki-laki"],
-    ["Ade Sumarna", "Catur", "Laki-laki"],
-    ["M. Setiabudi", "Catur", "Laki-laki"],
-    ["Sulaiman", "Catur", "Laki-laki"],
-    ["Mardi", "Catur", "Laki-laki"],
-    ["Rijalinor", "Catur", "Laki-laki"],
-    ["Tamrin", "Catur", "Laki-laki"],
-    ["Rusdianoor", "Catur", "Laki-laki"],
-    ["Mukhyar", "Catur", "Laki-laki"],
-    ["Muhammad Andy Al Ghifari", "Catur", "Laki-laki"],
-    ["Ahmad Supiani", "Catur", "Laki-laki"],
-    ["Nishfa Dayyana Rahmah", "Catur", "Perempuan"],
-    ["Wenny Meliana", "Catur", "Perempuan"],
-    ["Rizka Aulia Rahmi", "Catur", "Perempuan"],
-    ["Helma Ghinaya", "Catur", "Perempuan"],
-    ["Nailah Farapizah", "Catur", "Perempuan"],
-    ["Indah Nurul Laili", "Catur", "Perempuan"],
-    ["Afrah", "Catur", "Perempuan"],
-    ["Rusiana", "Catur", "Perempuan"],
-    ["Rinawati", "Catur", "Perempuan"],
-    ["Ahmad Fazarudin", "Drum Band", "Laki-laki"],
-    ["Ahmad Salman", "Drum Band", "Laki-laki"],
-    ["Ahmad Saufi", "Drum Band", "Laki-laki"],
-    ["Hasani", "Drum Band", "Laki-laki"],
-    ["M. Ferdy Yusuf", "Drum Band", "Laki-laki"],
-    ["Muhammad Gani", "Drum Band", "Laki-laki"],
-    ["Muhammad Heriansyah", "Drum Band", "Laki-laki"],
-    ["Muhammad Nabil", "Drum Band", "Laki-laki"],
-    ["Muhammad Rama", "Drum Band", "Laki-laki"],
-    ["Muhammad Suhail ‘Amr", "Drum Band", "Laki-laki"],
-    ["M. Aini Doni Ismadi", "Drum Band", "Laki-laki"],
-    ["Lexy Poliady", "Drum Band", "Laki-laki"],
-    ["Amelia", "Drum Band", "Perempuan"],
-    ["Erredha Nella Juarna Dewi", "Drum Band", "Perempuan"],
-    ["Helwa", "Drum Band", "Perempuan"],
-    ["Hernita Putri Cahyani", "Drum Band", "Perempuan"],
-    ["Ibnaty Sirin Ulya", "Drum Band", "Perempuan"],
-    ["Asyifa Al Munna", "Drum Band", "Perempuan"],
-    ["Nayla Ersa Almira", "Drum Band", "Perempuan"],
-    ["Noorlisa Hayati", "Drum Band", "Perempuan"],
-    ["Shevana Ceysha", "Drum Band", "Perempuan"],
-    ["Sri Dewi", "Drum Band", "Perempuan"],
-    ["Talita Lubna", "Drum Band", "Perempuan"],
-    ["Zaenatun Nuzula", "Drum Band", "Perempuan"],
-    ["Josua Aditia Leimana", "E-Sport", "Laki-laki"],
-    ["Rasha Putra Andrea", "E-Sport", "Laki-laki"],
-    ["Muhammad Alfarizi", "E-Sport", "Laki-laki"],
-    ["M.Hendri Kurniawan", "E-Sport", "Laki-laki"],
-    ["Muhammad Rifqi Fadhullah", "E-Sport", "Laki-laki"],
-    ["Muhammad Agy Fahrianoor", "E-Sport", "Laki-laki"],
-    ["Muhammad Taufik", "E-Sport", "Laki-laki"],
-    ["Kevin Reyzar Renanta", "E-Sport", "Laki-laki"],
-    ["Muhammad Rafa Redhana Putra", "E-Sport", "Laki-laki"],
-    ["Akhmad Novrizal Rahman", "Petanque", "Laki-laki"],
-    ["M. Rawis Badali Rahman", "Petanque", "Laki-laki"],
-    ["Ahmad Junaidi", "Petanque", "Laki-laki"],
-    ["Jarkani", "Petanque", "Laki-laki"],
-    ["Budi Saputra", "Petanque", "Laki-laki"],
-    ["M.Rifky Alfajar", "Petanque", "Laki-laki"],
-    ["Ahmad Munadi", "Petanque", "Laki-laki"],
-    ["Novi Hadi", "Petanque", "Laki-laki"],
-    ["Hidayaturahman", "Petanque", "Laki-laki"],
-    ["Roswita Zuraida", "Petanque", "Perempuan"],
-    ["Nazira Rahisya", "Petanque", "Perempuan"],
-    ["Zaskia Dzulhijjati Nuran", "Petanque", "Perempuan"],
-    ["Normuliyanti", "Petanque", "Perempuan"],
-    ["Sheza Anindya Arifin", "Petanque", "Perempuan"],
-    ["Rian Purnama Hakim", "Pickleball", "Laki-laki"],
-    ["Rudi Hartanto, S.Pd", "Pickleball", "Laki-laki"],
-    ["Bambang Mardianto, S.Kom", "Pickleball", "Laki-laki"],
-    ["Muhammad Khairi, S.Pd", "Pickleball", "Laki-laki"],
-    ["Mohamad Edwin Fadillah,S.Pi.Mp", "Pickleball", "Laki-laki"],
-    ["Adi Hamidan", "Pickleball", "Laki-laki"],
-    ["Masrah, S.Pd", "Pickleball", "Perempuan"],
-    ["Hinni Supya Rahmi, S.Pd", "Pickleball", "Perempuan"],
-    ["Mardhiatunnisa", "Pickleball", "Perempuan"],
-    ["Ayu Fauziah, S. Pd", "Pickleball", "Perempuan"],
-    ["Etsa Mardhotillah", "Pickleball", "Perempuan"],
-    ["Keisha Diva Faradisa", "Pickleball", "Perempuan"],
-    ["Zairullah Ardy", "Sepak Bola", "Laki-laki"],
-    ["Muhammad Fauzan Saputera", "Sepak Bola", "Laki-laki"],
-    ["Ahda Fahlifi", "Sepak Bola", "Laki-laki"],
-    ["M.Rizky Ramadhan", "Sepak Bola", "Laki-laki"],
-    ["Muhammad Badali", "Sepak Bola", "Laki-laki"],
-    ["Muhammad Ramaditya Ramadhani", "Sepak Bola", "Laki-laki"],
-    ["Nazwa Erli Pratama", "Sepak Bola", "Laki-laki"],
-    ["Zaki Ananda", "Sepak Bola", "Laki-laki"],
-    ["Ahmad Huzaifi", "Sepak Bola", "Laki-laki"],
-    ["Akhmad Rafi Maulana", "Sepak Bola", "Laki-laki"],
-    ["Mirza Khazindar", "Sepak Bola", "Laki-laki"],
-    ["Muhammad Ikhsan", "Sepak Bola", "Laki-laki"],
-    ["Syahrul Ali", "Sepak Bola", "Laki-laki"],
-    ["Rizky Aditya Fernanda", "Sepak Bola", "Laki-laki"],
-    ["Syarwani Abdan", "Sepak Bola", "Laki-laki"],
-    ["Ahmad Bayu", "Sepak Bola", "Laki-laki"],
-    ["Alfiansyah Nor Afrizal", "Sepak Bola", "Laki-laki"],
-    ["Hadmi Riansyah", "Sepak Bola", "Laki-laki"],
-    ["Ahmad Rafi", "Sepak Bola", "Laki-laki"],
-    ["Ikhsan Sardilah", "Sepak Bola", "Laki-laki"],
-    ["Muhammad Lyandra Ananda", "Sepak Takraw", "Laki-laki"],
-    ["Muhammad Sahiid", "Sepak Takraw", "Laki-laki"],
-    ["Muhammad Lucky Redhana", "Sepak Takraw", "Laki-laki"],
-    ["Muhammad Syafi'I", "Sepak Takraw", "Laki-laki"],
-    ["Muhammad Zaini", "Sepak Takraw", "Laki-laki"],
-    ["Mohammad Fathan Ali Najja", "Sepak Takraw", "Laki-laki"],
-    ["Ahmad Muzakir", "Sepak Takraw", "Laki-laki"],
-    ["M. Ruhul Amin", "Sepak Takraw", "Laki-laki"],
-    ["Syaifullah", "Sepak Takraw", "Laki-laki"],
-    ["Nabella Azizah", "Sepak Takraw", "Perempuan"],
-    ["Novia Lita", "Sepak Takraw", "Perempuan"],
-    ["Natasya Dewi", "Sepak Takraw", "Perempuan"],
-    ["Ahmadina Anggraini", "Sepak Takraw", "Perempuan"],
-    ["Raisya Hafizah", "Sepak Takraw", "Perempuan"],
-    ["Aqilla Rafa Adhelia", "Sepak Takraw", "Perempuan"],
-    ["Yuni Handayani", "Sepak Takraw", "Perempuan"],
-    ["Meisya Ananda", "Sepak Takraw", "Perempuan"],
-    ["Noor Hayati", "Sepak Takraw", "Perempuan"],
-    ["Putri Devia", "Sepak Takraw", "Perempuan"],
-    ["M. Ragil Putra Yuda", "Tenis Lapangan", "Laki-laki"],
-    ["M. Fawwaz Feriznanda", "Tenis Lapangan", "Laki-laki"],
-    ["Rahmadi", "Tenis Lapangan", "Laki-laki"],
-    ["Heru Trilaksono W.", "Tenis Lapangan", "Laki-laki"],
-    ["Erry Dian Saputra", "Tenis Lapangan", "Laki-laki"],
-    ["Dewangga Septyan P.", "Tenis Lapangan", "Laki-laki"],
-    ["Ervan Maulana", "Tenis Lapangan", "Laki-laki"],
-    ["Indra Dwi Prakoso", "Tenis Lapangan", "Laki-laki"],
-    ["Elma Malinda", "Tenis Lapangan", "Perempuan"],
-    ["Setia Indriharti", "Tenis Lapangan", "Perempuan"],
-    ["Assyifa Khansa Putri R.", "Tenis Lapangan", "Perempuan"],
-    ["Widdy Amita", "Tenis Lapangan", "Perempuan"],
-    ["M. Baihaki", "Tenis Meja", "Laki-laki"],
-    ["Achmad Taufik", "Tenis Meja", "Laki-laki"],
-    ["Fauziannor", "Tenis Meja", "Laki-laki"],
-    ["Muhammad Husaini", "Tenis Meja", "Laki-laki"],
-    ["Zainuddin", "Tenis Meja", "Laki-laki"],
-    ["M.Nabil Nazarul Azra", "Tenis Meja", "Laki-laki"],
-    ["H.Sayuti", "Tenis Meja", "Laki-laki"],
-    ["Ahmad Riyadi", "Tenis Meja", "Laki-laki"],
-    ["Nadya Indriyati", "Tenis Meja", "Perempuan"],
-    ["Justine Sadara", "Tenis Meja", "Perempuan"],
-    ["Ihsanul Amin", "Teqball", "Laki-laki"],
-    ["Muhammad Nabil Mumtazi", "Teqball", "Laki-laki"],
-    ["Arizal Syahbana", "Teqball", "Laki-laki"],
-    ["Muhammad Amien", "Teqball", "Laki-laki"],
-    ["M. Farid Akbar", "Teqball", "Laki-laki"],
-    ["M. Akbar", "Futsal", "Laki-laki"],
-    ["Ahmad Raihan", "Futsal", "Laki-laki"],
-    ["M. Arif Rahman", "Futsal", "Laki-laki"],
-    ["M. Iqbal Alqifhari", "Futsal", "Laki-laki"],
-    ["Ahmad Ajimi", "Futsal", "Laki-laki"],
-    ["M. Afif Azzahri", "Futsal", "Laki-laki"],
-    ["M. Faqih Nuzuli", "Futsal", "Laki-laki"],
-    ["M. Rivaldo Akbar", "Futsal", "Laki-laki"],
-    ["M. Naufal Razan", "Futsal", "Laki-laki"],
-    ["M. Ariyadi", "Futsal", "Laki-laki"],
-    ["Miftah Irvan", "Futsal", "Laki-laki"],
-    ["M. Daniel Akbar", "Futsal", "Laki-laki"],
-    ["Mardha Tillah", "Futsal", "Laki-laki"],
-    ["Raisya Putri Kamila", "Futsal", "Perempuan"],
-    ["Husna", "Futsal", "Perempuan"],
-    ["Noviya Ramadani", "Futsal", "Perempuan"],
-    ["Apriani Lestari", "Futsal", "Perempuan"],
-    ["Yemima Elisia", "Futsal", "Perempuan"],
-    ["Rahma Wulan Aprilita", "Futsal", "Perempuan"],
-    ["Joeana Dwita Cahyana", "Futsal", "Perempuan"],
-    ["Marzelita Zanuba Eleina Purnomo", "Futsal", "Perempuan"],
-    ["Annisa Puti Lenggoheni", "Futsal", "Perempuan"]
-  ];
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try {
-    const sh = sheet_('DataAtlet'), H = SHEETS.DataAtlet, n = H.length, lr = sh.getLastRow();
-    const low = s => String(s).trim().toLowerCase();
-    const cabLr = sheet_('Cabor').getLastRow();
-    const cabMap = {}; (cabLr > 1 ? sheet_('Cabor').getRange(2, 2, cabLr - 1, 1).getValues() : []).forEach(r => { if (r[0]) cabMap[low(r[0])] = String(r[0]).trim(); });
-    const cur = lr > 1 ? sh.getRange(2, 1, lr - 1, n).getValues() : [];
-    const idx = {}; cur.forEach((r, i) => { idx[low(r[1]) + '|' + low(r[2])] = i; });
-    let upd = 0; const baru = [], tanpaCabor = new Set();
-    DATA.forEach(d => {
-      const cab = cabMap[low(d[1])] || d[1]; if (!cabMap[low(d[1])]) tanpaCabor.add(d[1]);
-      const k = low(d[0]) + '|' + low(cab);
-      if (k in idx) { const r = cur[idx[k]]; if (d[2] && r[3] !== d[2]) { r[3] = d[2]; upd++; } }
-      else { const r = H.map(() => ''); r[0] = Utilities.getUuid().slice(0, 8); r[1] = d[0]; r[2] = cab; r[3] = d[2]; idx[k] = cur.length + baru.length; baru.push(r); }
-    });
-    if (cur.length) sh.getRange(2, 1, cur.length, n).setValues(cur);
-    if (baru.length) {
-      const start = sh.getLastRow() + 1, end = start + baru.length - 1;
-      if (end > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), end - sh.getMaxRows() + 50);
-      sh.getRange(start, 1, baru.length, n).setValues(baru);
-    }
-    patchCache_('DataAtlet');
-    const msg = 'Impor selesai: ' + baru.length + ' atlet ditambahkan, ' + upd + ' diperbarui (jenis kelamin).' +
-      (tanpaCabor.size ? ' Cabor belum ada di Master Cabor: ' + [...tanpaCabor].join(', ') : '');
-    Logger.log(msg); return msg;
-  } finally { lock.releaseLock(); }
-}
-
-/* ================= FEED VIDEO INSTAGRAM (@konikab.hsu) =================
- * Token disimpan di Script Properties dengan nama IG_TOKEN (Project Settings > Script properties).
- * Jangan menulis token langsung di kode ini. */
-const IG_CACHE_ = 'ig_media_v4', IG_STALE_ = 'ig_media_stale_v4', IG_MAX_ = 60;
-
-function igMedia() {
-  const cache = CacheService.getScriptCache(), hit = cache.get(IG_CACHE_);
-  if (hit) return JSON.parse(hit);
-  const token = PropertiesService.getScriptProperties().getProperty('IG_TOKEN');
-  if (!token) return { items: [], error: 'IG_TOKEN belum diatur' };
-  try {
-    // Ambil beberapa halaman (maks 4 x 50 post) supaya video terbaru tidak terlewat bila banyak postingan foto.
-    let url = 'https://graph.instagram.com/me/media?fields=id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp&limit=50&access_token=' + encodeURIComponent(token);
-    let all = [];
-    for (let i = 0; i < 4 && url; i++) {
-      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true }), body = JSON.parse(res.getContentText());
-      if (body.error) throw new Error(body.error.message || 'Instagram API error');
-      all = all.concat(body.data || []);
-      url = body.paging && body.paging.next ? body.paging.next : '';
-      if (all.filter(igIsPost_).length >= IG_MAX_) break;
-    }
-    // Pemutar memakai embed dari permalink, jadi media_url TIDAK wajib.
-    // (Instagram sengaja menghilangkan media_url pada video berlagu berhak cipta -> video terbaru dulu ikut terfilter.)
-    const items = all.filter(igIsPost_)
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))   // terbaru di atas
-      .slice(0, IG_MAX_).map(m => ({
-        id: m.id, p: m.permalink,
-        c: String(m.caption || '').replace(/\s+/g, ' ').slice(0, 140), d: m.timestamp
-      }));
-    // Tautan tambahan manual (untuk postingan kolaborasi/repost yang tidak dikirim Instagram):
-    // Project Settings > Script properties > IG_EXTRA, isi link dipisah spasi/koma/baris baru. Tampil paling atas.
-    const extra = String(PropertiesService.getScriptProperties().getProperty('IG_EXTRA') || '').split(/[\s,]+/)
-      .filter(u => /instagram\.com\/(reels?|p|tv)\//i.test(u)).map(u => ({ id: u, p: u, c: '', d: '' }));
-    const seen = {}; extra.forEach(x => { seen[x.p.replace(/\/$/, '')] = 1; });
-    const out = { items: extra.concat(items.filter(x => !seen[x.p.replace(/\/$/, '')])) };
-    const j = JSON.stringify(out);
-    cache.put(IG_CACHE_, j, 600);    // segar 10 menit
-    cache.put(IG_STALE_, j, 21600);  // cadangan 6 jam bila Instagram error
-    return out;
-  } catch (e) {
-    const old = cache.get(IG_STALE_);
-    if (old) return JSON.parse(old);
-    return { items: [], error: String((e && e.message) || e) };
-  }
-}
-
-// Semua jenis postingan (video, reel, foto, carousel) ikut tampil, sama seperti di profil Instagram.
-/** DIAGNOSA: daftar ringkas 1 baris per postingan yang dikirim Instagram (tanpa cache, tanpa token). Buka: <URL>/exec?action=igDebug */
-function igDebug_() {
-  const token = PropertiesService.getScriptProperties().getProperty('IG_TOKEN');
-  if (!token) return 'IG_TOKEN belum diatur';
-  const res = UrlFetchApp.fetch('https://graph.instagram.com/me/media?fields=id,media_type,media_product_type,permalink,timestamp&limit=50&access_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
-  const body = JSON.parse(res.getContentText());
-  if (body.error) return 'ERROR: ' + body.error.message;
-  const rows = (body.data || []).map((m, i) => (i + 1) + '. ' + String(m.timestamp).slice(0, 16) + ' | ' + m.media_type + ' | ' + (m.media_product_type || '-') + ' | ' + m.permalink);
-  return 'Total diterima: ' + rows.length + '\n' + rows.join('\n');
-}
-
-function igIsPost_(m) {
-  return !!m.permalink;
-}
-
-/** Perpanjang token 60 hari lagi. Dijalankan otomatis oleh trigger mingguan (lihat igPasangTrigger). */
-function igRefreshToken() {
-  const props = PropertiesService.getScriptProperties(), token = props.getProperty('IG_TOKEN');
-  if (!token) throw new Error('IG_TOKEN belum diatur');
-  const res = UrlFetchApp.fetch('https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
-  const body = JSON.parse(res.getContentText());
-  if (!body.access_token) throw new Error('Gagal refresh token: ' + res.getContentText());
-  props.setProperty('IG_TOKEN', body.access_token);
-  Logger.log('Token diperpanjang, berlaku ' + Math.round((body.expires_in || 0) / 86400) + ' hari');
-}
-
-/** Jalankan SEKALI dari editor: memberi izin UrlFetch, menguji token, dan memasang trigger perpanjangan mingguan. */
-function igPasangTrigger() {
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'igRefreshToken').forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('igRefreshToken').timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).create();
-  CacheService.getScriptCache().removeAll([IG_CACHE_, IG_STALE_]);
-  const r = igMedia();
-  Logger.log(r.error ? 'GAGAL: ' + r.error : 'OK, ' + r.items.length + ' video ditemukan');
-}
+function openM(h){$('#mb').innerHTML=h;$('#mo').classList.add('on')}
+function closeM(){$('#mo').classList.remove('on')}
+load();
+/* Saat tab kembali aktif, ambil data terbaru di latar belakang (tanpa reload halaman) */
+let lastF=Date.now();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastF>30000){lastF=Date.now();load(true)}});
+</script>
+</body>
+</html>
