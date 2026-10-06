@@ -277,7 +277,7 @@ function mediaCard(b){const e=embedUrl(b['Link Video']);if(!e)return newsCard(b)
 const IG_USER='konikab.hsu';let IGV=null;
 let IGE='';
 function igCards(a){return a.map(v=>{const e=embedUrl(v.p);if(!e)return '';return `<div class="card"><div class="vid ig"><iframe src="${esc(e.u)}" loading="lazy" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="Video Instagram KONI HSU"></iframe></div><div class="pd"><small>${esc(fmtD(v.d))}</small>${v.c?`<p>${esc(v.c)}</p>`:''}</div></div>`}).join('')}
-function igBox(){if(IGV===null||IGV==='loading')return '<div class="ld">Memuat video Instagram…</div>';if(!IGV.length)return `<div class="ld">Video belum bisa dimuat${IGE?' ('+esc(IGE)+')':''}.<br>Silakan buka langsung di <a href="https://www.instagram.com/${IG_USER}/reels/" target="_blank" rel="noopener">Instagram @${IG_USER}</a>.</div>`;return '<div class="grid g3">'+igCards(IGV)+'</div>'}
+function igBox(){if(IGV===null||IGV==='loading')return '<div class="ld">Memuat Instagram…</div>';if(!IGV.length)return `<div class="ld">Postingan belum bisa dimuat${IGE?' ('+esc(IGE)+')':''}.<br>Silakan buka langsung di <a href="https://www.instagram.com/${IG_USER}/reels/" target="_blank" rel="noopener">Instagram @${IG_USER}</a>.</div>`;return '<div class="grid g3">'+igCards(IGV)+'</div>'}
 function igLoad(){if(IGV!==null)return;IGV='loading';run('igMedia').then(d=>{IGV=(d&&d.items)||[];IGE=(d&&d.error)||''}).catch(e=>{IGV=[];IGE=(e&&e.message)||'gagal terhubung'}).then(()=>{const el=document.getElementById('igv');if(el)el.innerHTML=igBox()})}
 function igFeed(){igLoad();return `<div id="igv">${igBox()}</div>`}
 function igpage(){return hd('<span>Instagram</span>','Akun resmi @'+IG_USER,'Instagram')+`<div class="w pg">${igFeed()}</div>`}
