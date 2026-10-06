@@ -272,15 +272,12 @@ function cabor(){
     return hd(`<span>${esc(cs)}</span>`+(ck?` · ${ck}`:''),'Jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg"><div class="fx" style="margin-bottom:14px;justify-content:flex-end"><button class="btn backbtn" onclick="cs='';render()">← Semua Cabang Olahraga</button></div>${inf}
     ${ks.length>1?chips([['','Semua'],...ks.map(k=>[k,k])],ck,'setCk'):''}
     <div class="tabs">${[['pert','🎯 Jenis Pertandingan'],['atlet','🏃 Atlet']].map(([k,l])=>`<button class="${ct===k?'on':''}" onclick="ct='${k}';lim=100;render()">${l}</button>`).join('')}</div><div id="cl">${cDetail()}</div></div>`}
-  const nb=caborList('Beregu').filter(hasD).length,np=caborList('Perorangan').filter(hasD).length;
-  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beregu dan perorangan beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg">${chips([['','Semua'],['Beregu',`👥 Beregu (${nb})`],['Perorangan',`🧍 Perorangan (${np})`]],ck,'setCk')}<div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"><select onchange="kc=this.value;upd()"><option value="">Semua Kategori</option>${opt(katList(),kc)}</select></div><div id="cl">${cList()}</div></div>`}
+  return hd('Cabang <span>Olahraga</span>','Daftar cabang olahraga beserta jenis pertandingan dan atlet','🏟️ Cabang Olahraga')+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari cabang olahraga…" value="${esc(cq)}" oninput="cq=this.value;upd()"><select onchange="kc=this.value;upd()"><option value="">Semua Kategori</option>${opt(katList(),kc)}</select></div><div id="cl">${cList()}</div></div>`}
 const katList=()=>{const m=S.kategoricabor.map(k=>String(k['Nama Kategori']||'').trim()).filter(Boolean);S.cabor.forEach(c=>{const k=String(c.Kategori||'').trim();if(k&&!m.includes(k))m.push(k)});return m};
 function cList(){const q=cq.toLowerCase(),ok=c=>c.n.toLowerCase().includes(q)&&(!kc||String(kpOf(c.n).Kategori||'').trim()===kc);CL=[];
   const card=(c,k)=>{CL.push({n:c.n,k});return `<div class="card h cb" onclick="pick(${CL.length-1})"><h3>${esc(c.n)}</h3><div class="md"><span class="bd">🏃 ${c.a} atlet</span><span class="bd">🎯 ${c.pt} pertandingan</span></div>${kpInfo(c.n)}</div>`};
-  const L={Beregu:caborList('Beregu').filter(c=>hasD(c)&&ok(c)),Perorangan:caborList('Perorangan').filter(c=>hasD(c)&&ok(c))};
-  const used=new Set([...L.Beregu,...L.Perorangan].map(c=>c.n)),rest=caborList().filter(c=>ok(c)&&!used.has(c.n));
-  const sec=(t,l,k)=>l.length?`<h2 class="sec">${t} <span class="bd">${l.length} cabor</span></h2><div class="grid">${l.map(c=>card(c,k)).join('')}</div>`:'';
-  const h=(!ck||ck==='Beregu'?sec('👥 Cabang Olahraga Beregu',L.Beregu,'Beregu'):'')+(!ck||ck==='Perorangan'?sec('🧍 Cabang Olahraga Perorangan',L.Perorangan,'Perorangan'):'')+(!ck?sec('📋 Belum Dikategorikan',rest,''):'');
+  const l=caborList().filter(ok);
+  const h=l.length?`<h2 class="sec">Daftar Cabang Olahraga <span class="bd">${l.length} cabor</span></h2><div class="grid">${l.map(c=>card(c,'')).join('')}</div>`:'';
   return h||'<p class="sub">Cabang olahraga tidak ditemukan.</p>'}
 function pick(i){cs=CL[i].n;ck=CL[i].k;ct='pert';lim=100;render()}
 function cDetail(){return ct==='pert'?pertView():athGrid(S.ath.filter(a=>a.c===cs&&(!ck||a.p.some(r=>r.Kategori===ck))))}
