@@ -144,6 +144,7 @@ const FORM={
  KategoriCabor:[['Nama Kategori']],
  Pertandingan:[['Cabor','c'],['Nama Pertandingan'],['Kategori','s',KT]],
  DataAtlet:[['Nama Atlet'],['Cabor','c'],['Jenis Kelamin','s',['','Laki-laki','Perempuan']],['Tanggal Lahir','d'],['Alamat'],['Foto Profil','i']],
+ RepostIG:[['Link Instagram'],['Keterangan'],['Tanggal','d']],
  Atlet:[['Cabor','c'],['Pertandingan','p'],['Nama Atlet','a'],['Kategori','s',KT],['Medali','s',['','Emas','Perak','Perunggu']],['Atelet Porprov 2022','s',OY],['Prestasi Porprov 2022','s',OY],[MK]]
 };
 const CFG={
@@ -151,9 +152,10 @@ const CFG={
  KategoriCabor:{k:'ID',dk:'kategoricabor',t:'Kategori Cabor',d:'Kategori cabang olahraga (mis. Akurasi, Bela Diri, Permainan, Terukur). Tambahkan kategori baru di sini; kategori yang masih dipakai cabor tidak bisa dihapus',add:'Kategori',cols:['Nama Kategori'],sk:['Nama Kategori'],sort:1},
  Pertandingan:{k:'ID',dk:'pertandingan',t:'Jenis Pertandingan',d:'Nomor / jenis pertandingan pada tiap cabang olahraga',add:'Pertandingan',cols:['Cabor','Nama Pertandingan','Kategori'],sort:1},
  DataAtlet:{k:'ID',dk:'dataatlet',t:'Data Atlet',d:'Master data atlet. Foto Profil tampil di website',add:'Atlet',cols:['Foto Profil','Nama Atlet','Cabor','Jenis Kelamin'],sk:['Nama Atlet','Cabor'],q:['Nama Atlet','Cabor','Jenis Kelamin'],sort:1},
+ RepostIG:{k:'ID',dk:'repostig',t:'Repost Instagram',d:'Video repost / kolaborasi di @konikab.hsu tidak dikirim oleh Instagram. Tempel link-nya di sini agar ikut tampil di menu Instagram website',add:'Repost',cols:['Link Instagram','Keterangan','Tanggal']},
  Atlet:{k:'No',dk:'atlet',t:'Prestasi Atlet Porprov 2025',d:'Data prestasi atlet pada Porprov 2025 — tampil di halaman Cabang Olahraga website',add:'Prestasi',cols:['Nama Atlet','Cabor','Pertandingan','Medali']}
 };
-const MENU=[['Berita','📰','Berita','Kelola berita yang tampil di menu Berita website'],['Profil','👥','Profil','Kelola visi, misi, sejarah, struktur organisasi, dan kontak'],['-','Cabang Olahraga'],['Cabor','🏟️','Master Cabor',CFG.Cabor.d],['KategoriCabor','🗂️','Kategori Cabor',CFG.KategoriCabor.d],['Pertandingan','🎯','Jenis Pertandingan',CFG.Pertandingan.d],['DataAtlet','🏃','Data Atlet',CFG.DataAtlet.d],['Atlet','🏅','Prestasi Porprov 2025',CFG.Atlet.d]];
+const MENU=[['Berita','📰','Berita','Kelola berita yang tampil di menu Berita website'],['Profil','👥','Profil','Kelola visi, misi, sejarah, struktur organisasi, dan kontak'],['-','Cabang Olahraga'],['Cabor','🏟️','Master Cabor',CFG.Cabor.d],['KategoriCabor','🗂️','Kategori Cabor',CFG.KategoriCabor.d],['Pertandingan','🎯','Jenis Pertandingan',CFG.Pertandingan.d],['DataAtlet','🏃','Data Atlet',CFG.DataAtlet.d],['Atlet','🏅','Prestasi Porprov 2025',CFG.Atlet.d],['-','Instagram'],['RepostIG','🔁','Repost Instagram',CFG.RepostIG.d]];
 
 const PF=[['visi','Visi','t'],['misi','Misi (satu baris = satu poin)','t'],['sejarah','Sejarah / Tentang','t'],['struktur','Struktur Organisasi (format: Jabatan | Nama, satu per baris)','t'],['alamat','Alamat'],['telepon','Telepon'],['email','Email']];
 function toggleAdminDrawer(){document.body.classList.toggle('admin-nav-open')}
@@ -199,7 +201,7 @@ function cabChg(){const cab=$('#mb [data-k="Cabor"]').value;$('#fp').innerHTML=o
 function pertChg(){const cab=$('#mb [data-k="Cabor"]').value,p=$('#fp').value,m=A.pertandingan.find(x=>x.Cabor===cab&&x['Nama Pertandingan']===p);if(m&&m.Kategori)$('#mb [data-k="Kategori"]').value=m.Kategori}
 function edit(n,id){
   const c=CFG[n]||{k:'ID',dk:'berita'},r=id?A[c.dk].find(x=>String(x[c.k])===String(id)):{},cab=r.Cabor||'';
-  const fld=FORM[n].map(([k,t,o])=>{const v=r[k]==null?(k==='Tanggal'&&n==='Berita'?new Date().toISOString().slice(0,10):''):r[k];let inp;
+  const fld=FORM[n].map(([k,t,o])=>{const v=r[k]==null?(k==='Tanggal'&&(n==='Berita'||n==='RepostIG')?new Date().toISOString().slice(0,10):''):r[k];let inp;
     if(t==='i')inp=imgField(k,v,n==='Berita'?'berita':'profil');
     else if(t==='t')inp=`<textarea rows="5" data-k="${k}">${esc(v)}</textarea>`;
     else if(t==='c')inp=`<select data-k="${k}" ${n==='Atlet'?'onchange="cabChg()"':''}>${opts(['',...cabNames()],v)}</select>`;
@@ -212,7 +214,7 @@ function edit(n,id){
   openM(`<h2 style="margin-bottom:16px">${id?'Edit':'Tambah'} ${c.add||'Berita'}</h2>${fld}<div class="fx"><button class="btn g" onclick="closeM()">Batal</button><button class="btn" id="btnSv" onclick="saveF('${n}','${id?esc(id):''}')">Simpan</button></div>`)}
 function saveF(n,id){if(UP)return toast('Tunggu, foto sedang diunggah');const c=CFG[n]||{k:'ID'},o={};o[c.k]=id;document.querySelectorAll('#mb [data-k]').forEach(e=>o[e.dataset.k]=e.value);
   if(n==='Berita')o.Gambar=driveImg(o.Gambar);
-  const need={KategoriCabor:'Nama Kategori',Berita:'Judul',Cabor:'Nama Cabor',Pertandingan:'Nama Pertandingan',DataAtlet:'Nama Atlet',Atlet:'Nama Atlet'}[n];if(!String(o[need]||'').trim())return toast(need+' wajib diisi');
+  const need={KategoriCabor:'Nama Kategori',Berita:'Judul',Cabor:'Nama Cabor',Pertandingan:'Nama Pertandingan',DataAtlet:'Nama Atlet',Atlet:'Nama Atlet',RepostIG:'Link Instagram'}[n];if(!String(o[need]||'').trim())return toast(need+' wajib diisi');
   const oldKat=n==='KategoriCabor'&&id?((A.kategoricabor||[]).find(x=>String(x.ID)===String(id))||{})['Nama Kategori']:null;
   const sv=$('#btnSv');if(sv){if(sv.disabled)return;sv.disabled=true;sv.innerHTML='<span class="spin"></span>Menyimpan…'}
   run('saveRow',TOKEN,n,o).then(rid=>{o[c.k]=rid;localPut(n,o);if(oldKat&&oldKat!==o['Nama Kategori'])A.cabor.forEach(x=>{if(x.Kategori===oldKat)x.Kategori=o['Nama Kategori']});closeM();toast('Tersimpan');render()}).catch(e=>{toast(e.message);const x=$('#btnSv');if(x){x.disabled=false;x.textContent='Simpan'}})}
