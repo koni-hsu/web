@@ -73,6 +73,27 @@ h2{font-size:24px;font-weight:800;line-height:1.25;margin-bottom:4px}.sub{color:
 .ph h1{font-size:clamp(22px,3.4vw,30px);font-weight:800;line-height:1.15}
 .ph h1 span{background:linear-gradient(90deg,var(--g),#ff7b7b);-webkit-background-clip:text;background-clip:text;color:transparent}
 .ph p{opacity:.8;font-size:14px;margin-top:5px;max-width:600px}
+/* ---- Profil ---- */
+.pfw{background:radial-gradient(circle at 8% 12%,rgba(200,16,46,.09),transparent 38%),radial-gradient(circle at 94% 40%,rgba(29,58,138,.10),transparent 42%),radial-gradient(circle at 15% 88%,rgba(245,184,0,.12),transparent 36%),linear-gradient(180deg,#eef1f9 0%,#f7f8fc 50%,#eef1f9 100%);position:relative}
+.pfw:before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(11,19,48,.07) 1px,transparent 1px);background-size:22px 22px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%);pointer-events:none}
+.pf{position:relative}
+.pf .box{position:relative;overflow:hidden;border:1px solid rgba(11,19,48,.07);box-shadow:0 10px 30px -12px rgba(11,19,48,.18);padding:30px 32px 30px 36px}
+.pf .box:before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:linear-gradient(180deg,var(--r),var(--g))}
+.pf .box h3{font-size:20px;color:var(--n);padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--b)}
+.pf .box p{color:#3a4262}
+.pf .box.vs{background:radial-gradient(circle at 85% 20%,rgba(245,184,0,.22),transparent 45%),linear-gradient(135deg,#7a0a1e 0%,#0b1330 60%,#1d3a8a 100%);color:#fff;border:0}
+.pf .box.vs:before{background:var(--g)}
+.pf .box.vs h3{color:var(--g);border-bottom-color:rgba(255,255,255,.18)}
+.pf .box.vs p{color:#fff;font-size:18px;font-weight:600;line-height:1.7}
+.pf .box ol{list-style:none;padding:0;counter-reset:m}
+.pf .box ol li{counter-increment:m;position:relative;padding:12px 14px 12px 56px;margin:10px 0;background:var(--bg);border-radius:14px;min-height:48px}
+.pf .box ol li:before{content:counter(m);position:absolute;left:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--r),#8f0a20);color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center}
+.pf .box p+p{margin-top:10px}
+.pf .org div{background:linear-gradient(180deg,#fff,var(--bg));border:1px solid var(--b);border-top:4px solid var(--r);box-shadow:0 6px 18px -10px rgba(11,19,48,.25);transition:.25s}
+.pf .org div:hover{transform:translateY(-4px);box-shadow:0 14px 26px -12px rgba(11,19,48,.35);border-top-color:var(--g)}
+.pf .org small{text-transform:uppercase;letter-spacing:.6px;font-size:11px;font-weight:700}
+.pf .org b{color:var(--n);font-size:17px;margin-top:2px}
+@media(max-width:760px){.pf .box{padding:22px 20px 22px 26px}.pf .box.vs p{font-size:16px}}
 .box{background:var(--c);border-radius:20px;padding:28px;border:1px solid var(--b);margin-bottom:22px}
 .box h3{margin-bottom:10px;display:flex;gap:8px;align-items:center}
 .box ol{padding-left:20px}.box li{margin:6px 0}
@@ -254,11 +275,11 @@ function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)
   openM(`<small style="color:var(--r);font-weight:700">${esc(fmtD(b.Tanggal))}</small><h2 style="margin:6px 0 14px">${esc(b.Judul)}</h2>${b.Gambar?`<img src="${esc(b.Gambar)}" style="width:100%;border-radius:16px;margin-bottom:14px">`:''}<div>${lines(b.Isi||b.Ringkasan).map(p=>`<p style="margin-bottom:10px">${esc(p).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--r);word-break:break-all">$1</a>')}</p>`).join('')}</div><br><button class="btn g" onclick="closeM()">Tutup</button>`)}
 function profil(){const p=S.profil;
   return hd('Profile <span>KONI HSU</span>','Mengenal organisasi, visi, dan misi kami','🏛️ Profil Organisasi')+`
-  <div class="w pg"><div class="box rv"><h3>🎯 Visi</h3><p>${esc(p.visi)}</p></div>
+  <div class="pfw"><div class="w pg pf"><div class="box vs rv"><h3>🎯 Visi</h3><p>${esc(p.visi)}</p></div>
   <div class="box rv"><h3>🚀 Misi</h3><ol>${lines(p.misi).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div>
   <div class="box rv"><h3>📖 Sejarah</h3>${lines(p.sejarah).map(x=>`<p>${esc(x)}</p>`).join('')}</div>
   <div class="box rv"><h3>👥 Struktur Organisasi</h3><div class="org">${lines(p.struktur).map(l=>{const[a,b]=l.split('|');return `<div><small>${esc((a||'').trim())}</small><b>${esc((b||'').trim())}</b></div>`}).join('')}</div></div>
-  <div class="box rv"><h3>📍 Kontak</h3><p>${esc(p.alamat)}<br>Telp: ${esc(p.telepon)} · Email: ${esc(p.email)}</p></div></div>`}
+  <div class="box rv"><h3>📍 Kontak</h3><p>${esc(p.alamat)}<br>Telp: ${esc(p.telepon)} · Email: ${esc(p.email)}</p></div></div></div>`}
 const hd=(t,p,g)=>`<div class="ph"><div class="w"><span class="tag">${g||'🏅 KONI Hulu Sungai Utara'}</span><h1>${t}</h1><p>${p}</p></div></div>`;
 const MED=['Emas','Perak','Perunggu'];
 const opt=(l,v)=>l.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
