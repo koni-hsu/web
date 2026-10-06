@@ -188,7 +188,7 @@ body.nav-open:after{z-index:110!important}
   <button class="burger" aria-label="Buka menu" onclick="toggleNav()">☰</button>
   <div class="logo" onclick="go('home')"><i class="lg"><img data-logo alt="Logo KONI HSU"></i><div>KONI<small>Kab. Hulu Sungai Utara</small></div></div>
   <div class="menu">
-    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><div class="dd"><a class="dt" data-p="berita,artikel,media" onclick="this.parentNode.classList.toggle('open')">Berita ▾</a><div class="dm"><a data-p="artikel" onclick="go('artikel')">📰 Artikel</a><a data-p="media" onclick="go('media')">🎬 Media</a></div></div>
+    <a data-p="home" onclick="go('home')">Home</a><a data-p="profil" onclick="go('profil')">Profile</a><div class="dd"><a class="dt" data-p="berita,artikel,media" onclick="this.parentNode.classList.toggle('open')">Berita ▾</a><div class="dm"><a data-p="artikel" onclick="go('artikel')">📰 Artikel</a><a data-p="media" onclick="go('media')">🎬 Media</a></div></div><a data-p="ig" onclick="go('ig')">📸 Video Instagram</a>
     <div class="dd"><a class="dt" data-p="cabor,atlet" onclick="this.parentNode.classList.toggle('open')">Cabor &amp; Atlet ▾</a><div class="dm"><a data-p="cabor" onclick="go('cabor')">🏟️ Cabor</a><a data-p="atlet" onclick="go('atlet')">🏃 Atlet</a></div></div>
     <div class="dd"><a class="dt" data-p="porprov" onclick="this.parentNode.classList.toggle('open')">Prestasi Atlet ▾</a><div class="dm"><a data-p="porprov" onclick="go('porprov')">🏅 Porprov 2025</a></div></div>
   </div>
@@ -234,7 +234,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeNav()})
 function go(p){page=p;lim=100;document.querySelectorAll('.dd').forEach(d=>d.classList.remove('open'));closeNav();render();scrollTo(0,0)}
 function render(){
   document.querySelectorAll('.menu a').forEach(a=>a.classList.toggle('on',a.dataset.p.split(',').includes(page)));
-  $('#app').innerHTML=({home,profil,berita,artikel:berita,media:berita,cabor,atlet,porprov})[page]();
+  $('#app').innerHTML=({home,profil,berita,artikel:berita,media:berita,ig:igpage,cabor,atlet,porprov})[page]();
   if(page==='home')count();
   const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('in')),{threshold:.1});
   document.querySelectorAll('.rv').forEach(el=>io.observe(el));
@@ -279,8 +279,9 @@ function igCards(a){return a.map(v=>`<div class="igc"><video controls preload="n
 function igBox(){if(IGV===null||IGV==='loading')return '<div class="ld">Memuat video Instagram…</div>';if(!IGV.length)return `<div class="igp"><iframe src="https://www.instagram.com/${IG_USER}/embed" loading="lazy" title="Instagram @${IG_USER}"></iframe></div>`;return '<div class="igg">'+igCards(IGV)+'</div>'}
 function igLoad(){if(IGV!==null)return;IGV='loading';run('igMedia').then(d=>{IGV=(d&&d.items)||[]}).catch(()=>{IGV=[]}).then(()=>{const el=document.getElementById('igv');if(el)el.innerHTML=igBox()})}
 function igFeed(){igLoad();return `<div class="igb"><span>📸 Video terbaru dari Instagram <b>@${IG_USER}</b></span><a class="btn s" href="https://www.instagram.com/${IG_USER}/" target="_blank" rel="noopener">Buka Instagram</a></div><div id="igv">${igBox()}</div>`}
+function igpage(){return hd('Video <span>Instagram</span>','Video terbaru dari akun resmi @'+IG_USER,'📸 Instagram')+`<div class="w pg">${igFeed()}</div>`}
 function berita(){const md=page==='media';
-  return (md?hd('Media <span>KONI HSU</span>','Liputan, foto, dan publikasi media KONI Hulu Sungai Utara','🎬 Media'):hd('Artikel <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Artikel'))+`<div class="w pg">${md?igFeed():''}<div class="bar"><input placeholder="🔍 Cari ${md?'media':'artikel'}…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
+  return (md?hd('Media <span>KONI HSU</span>','Liputan, foto, dan publikasi media KONI Hulu Sungai Utara','🎬 Media'):hd('Artikel <span>Terbaru</span>','Kabar terkini dari dunia olahraga Hulu Sungai Utara','📰 Artikel'))+`<div class="w pg"><div class="bar"><input placeholder="🔍 Cari ${md?'media':'artikel'}…" value="${esc(bq)}" oninput="bq=this.value;lim=100;upd()"></div><div id="cl">${beritaBody()}</div></div>`}
 function beritaBody(){const kat=page==='media'?'Media':'Artikel',q=bq.toLowerCase(),all=S.berita.filter(b=>(String(b.Kategori||'').trim().toLowerCase()||'artikel')===kat.toLowerCase()),f=all.filter(b=>!q||[b.Judul,b.Ringkasan,b.Isi].join(' ').toLowerCase().includes(q)),nm=kat.toLowerCase();
   return f.length?`<p class="sub">${f.length} ${nm}</p><div class="grid">${f.map(kat==='Media'?mediaCard:newsCard).join('')}</div>`:`<p class="sub">${all.length?(kat+' tidak ditemukan.'):'Belum ada '+nm+'.'}</p>`}
 function readNews(id){const b=S.berita.find(x=>String(x.ID)===String(id));if(!b)return;
